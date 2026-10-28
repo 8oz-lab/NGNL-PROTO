@@ -15,10 +15,6 @@ config/features=PackedStringArray("4.3", "Forward Plus")
 GameState="*res://scripts/game_state.gd"
 Flow="*res://scripts/flow.gd"
 
-[audio]
-
-general/text_to_speech=true
-
 [display]
 
 window/size/viewport_width=1600

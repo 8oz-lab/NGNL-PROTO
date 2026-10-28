@@ -90,7 +90,20 @@ func loop(name: String, volume_db := 0.0) -> void:
 	add_child(p)
 	p.play()
 	create_tween().tween_property(p, "volume_db", volume_db, 0.8)
+	p.set_meta("base_db", volume_db)
 	_loops[name] = p
+
+
+## Senkt eine Schleife vorübergehend ab (offset in dB relativ zur ursprünglichen Lautstärke, 0 = normal).
+func duck(name: String, offset: float, time := 0.4) -> void:
+	if not _loops.has(name):
+		return
+	var p: AudioStreamPlayer = _loops[name]
+	var target: float = p.get_meta("base_db", p.volume_db) + offset
+	if p.get_meta("duck", 0.0) == offset:
+		return
+	p.set_meta("duck", offset)
+	create_tween().tween_property(p, "volume_db", target, time)
 
 
 func stop_loop(name: String, time := 0.8) -> void:
@@ -131,6 +144,11 @@ func _dev_args() -> void:
 		if arg.begins_with("--start="):
 			var key := arg.trim_prefix("--start=")
 			get_tree().change_scene_to_file.call_deferred(SCENES[key])
+		elif arg.begins_with("--probe="):
+			# Hängt ein Prüfskript an (z. B. res://tests/voice_probe.gd), das während des Spiels mitliest
+			var probe := Node.new()
+			probe.set_script(load(arg.trim_prefix("--probe=")))
+			add_child(probe)
 		elif arg.begins_with("--shots="):
 			_shot_path = arg.trim_prefix("--shots=")
 		elif arg.begins_with("--at="):

@@ -30,9 +30,11 @@ const LINES := [
 		"それじゃ、いつかゲーム盤の上でまた会おうね。ディスボードへようこそ！"],
 ]
 
-const VOICES := ["babble", "jp", "off"]
-const VOICE_NAMES := {"babble": "Brabbeln", "jp": "Japanisch (Sprachausgabe)", "off": "Aus"}
+const VOICES := ["voice", "babble", "off"]
+const VOICE_NAMES := {"voice": "Teto, Japanisch", "babble": "Brabbeln", "off": "Aus"}
 const CHARS_PER_SEC := 34.0
+## Gesprochene Zeilen, erzeugt mit tools/make_teto_voice.py (Kokoro-TTS)
+const VOICE_PATH := "res://assets/audio/teto/teto_%02d.ogg"
 const ALT_START := 2600.0
 const ALT_TALK_END := 700.0
 const DIVE_TIME := 6.5
@@ -85,8 +87,9 @@ var island_top := Vector3(0, 120, 0)
 var line := -1
 var typed := 0.0
 var hold := 0.0
-var voice := "babble"
-var _jp_voice := ""
+var voice := "voice"
+var _voice: AudioStreamPlayer
+var _speed := CHARS_PER_SEC
 var _last_char := 0
 var _t := 0.0
 var _dive := -1.0
@@ -124,9 +127,9 @@ func _ready() -> void:
 	cam.current = true
 	_build_speed_lines()
 	_build_ui()
-	for v in DisplayServer.tts_get_voices_for_language("ja"):
-		_jp_voice = v
-		break
+	_voice = AudioStreamPlayer.new()
+	_voice.volume_db = 1.0
+	add_child(_voice)
 	Flow.loop("wind", -6)
 	_place_camera(0.0)
 	get_tree().create_timer(1.6).timeout.connect(_next_line)
@@ -405,7 +408,7 @@ func _build_ui() -> void:
 	hint.add_theme_color_override("font_outline_color", Color(0.1, 0.1, 0.3, 0.8))
 	hint.add_theme_constant_override("outline_size", 4)
 	hint.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	hint.offset_left = -520
+	hint.offset_left = -900
 	hint.offset_right = -20
 	hint.offset_top = 16
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -415,13 +418,11 @@ func _build_ui() -> void:
 
 func _update_hint() -> void:
 	var vname: String = VOICE_NAMES[voice]
-	if voice == "jp" and _jp_voice == "":
-		vname += " – keine japanische Stimme installiert"
 	hint.text = "Klick / Leertaste: weiter   ·   V: Stimme (%s)   ·   Esc: überspringen" % vname
 
 
 func _next_line() -> void:
-	_tts_stop()
+	_voice.stop()
 	line += 1
 	if line >= LINES.size():
 		_start_dive()
@@ -433,6 +434,7 @@ func _next_line() -> void:
 	typed = 0.0
 	_last_char = 0
 	hold = 0.0
+	_speed = CHARS_PER_SEC
 	if panel.modulate.a < 1.0:
 		create_tween().tween_property(panel, "modulate:a", 1.0, 0.5)
 	if l[0] != "":
@@ -446,13 +448,20 @@ func _next_line() -> void:
 		Flow.play("blip", -6, 0.6 + line * 0.05)
 	else:
 		create_tween().tween_property(numeral, "modulate:a", 0.0, 0.4)
-	if voice == "jp" and _jp_voice != "":
-		DisplayServer.tts_speak(l[2], _jp_voice, 80, 1.35, 1.05)
+	if voice == "voice":
+		_speak()
 
 
-func _tts_stop() -> void:
-	if _jp_voice != "":
-		DisplayServer.tts_stop()
+## Spielt die gesprochene Zeile; der Untertitel läuft so schnell, dass er mit der Stimme endet.
+func _speak() -> void:
+	var path := VOICE_PATH % line
+	if not ResourceLoader.exists(path):
+		return
+	var stream: AudioStream = load(path)
+	_voice.stream = stream
+	_voice.play()
+	_speed = maxf(14.0, LINES[line][1].length() / maxf(0.5, stream.get_length() * 0.9))
+	Flow.duck("wind", -16.0)
 
 
 func _start_dive() -> void:
@@ -468,8 +477,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		match (event as InputEventKey).keycode:
 			KEY_V:
 				voice = VOICES[(VOICES.find(voice) + 1) % VOICES.size()]
-				if voice != "jp":
-					_tts_stop()
+				if voice != "voice":
+					_voice.stop()
+					_speed = CHARS_PER_SEC
 				_update_hint()
 			KEY_SPACE, KEY_ENTER:
 				_advance()
@@ -494,7 +504,7 @@ func _process(delta: float) -> void:
 	if line >= 0 and line < LINES.size():
 		var total: int = LINES[line][1].length()
 		if typed < total:
-			typed = minf(total, typed + delta * CHARS_PER_SEC)
+			typed = minf(total, typed + delta * _speed)
 			var n := int(typed)
 			text_label.visible_characters = n
 			if voice == "babble" and n - _last_char >= 3:
@@ -502,11 +512,14 @@ func _process(delta: float) -> void:
 				if ch != " ":
 					Flow.play("babble", -9, randf_range(1.25, 1.7))
 				_last_char = n
-		else:
+		elif not _voice.playing:
 			hold += delta
-			if hold > 2.2 + total * 0.022:
+			# Mit Stimme ist der Text schon mitgelesen, danach nur noch eine kurze Pause
+			if hold > (1.3 if voice == "voice" else 2.2 + total * 0.022):
 				_next_line()
-	(orb as TetoOrb).talking = line >= 0 and line < LINES.size() and typed < LINES[line][1].length()
+	(orb as TetoOrb).talking = _voice.playing or (line >= 0 and line < LINES.size() and typed < LINES[line][1].length())
+	if not _voice.playing:
+		Flow.duck("wind", 0.0)
 	if _dive >= 0.0:
 		_dive += delta
 		if _dive > DIVE_TIME:
@@ -577,7 +590,7 @@ func _finish() -> void:
 	if _done:
 		return
 	_done = true
-	_tts_stop()
+	_voice.stop()
 	Flow.stop_loop("wind", 1.0)
 	Flow.goto("world", Color.WHITE, 0.6, 1.4)
 

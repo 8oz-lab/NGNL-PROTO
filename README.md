@@ -16,7 +16,7 @@ Das Spiel beginnt wie im Anime auf einem alten Windows-Desktop:
 1. Im Posteingang landet eine Mail von **???**: „Challenge für 「　」“. Antwort: **Ja** (oder zweimal Nein).
 2. Der Schriftzug **ようこそ♪** läuft über den Bildschirm, danach öffnet sich **Schach 98**. Figuren anklicken oder ziehen.
 3. Nach dem Sieg bricht das Brett, dann der Bildschirm. Aus der Ich-Perspektive seht ihr den Röhrenmonitor im Zimmer: Er flackert, sprüht Funken, das Glas zerspringt und ein Strudel zieht euch hinein.
-4. Sturz durch den Himmel von Disboard, Teto erklärt die Zehn Gebote (Klick/Leertaste: weiter, **V**: Stimme Brabbeln / Japanisch / aus).
+4. Sturz durch den Himmel von Disboard, Teto erklärt die Zehn Gebote auf Japanisch mit deutschen Untertiteln (Klick/Leertaste: weiter, **V**: Stimme Teto / Brabbeln / aus).
 5. Landung auf dem Grundstück.
 
 Auf dem Desktop gibt es außerdem:
@@ -57,6 +57,7 @@ Auf dem Desktop gibt es außerdem:
 | `scripts/toon.gd` | Toon-Materialien mit Umrisslinie |
 | `assets/shaders/` | Toon-Shader (3 Lichtstufen) und Umriss-Shader |
 | `assets/models/` | GLB-Modelle aus Tripo. Figuren: `sora_neu.glb`, `shiro_neu.glb`; fehlende Animationen kommen per Humanoid-Retargeting (`mixamo_bone_map.tres`) aus `sora.glb`/`shiro.glb` |
+| `assets/audio/teto/` | Tetos gesprochene Zeilen, erzeugt mit `tools/make_teto_voice.py` (Kokoro-TTS, Apache-2.0; Anleitung im Skript) |
 | `tools/fix_gltf_matrix.py` | Repariert GLB-Dateien, deren Knochen als Matrix gespeichert sind (sonst fällt das Skelett in Godot zusammen) |
 
 Der Spielstand wird beim Betreten der Hütte gespeichert (`user://save.json`).
