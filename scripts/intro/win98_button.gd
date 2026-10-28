@@ -10,6 +10,14 @@ var text := "":
 		queue_redraw()
 var font_size := 13
 var bold := false
+## Dauerhaft eingedrückt (z. B. aktiver Eintrag in der Taskleiste)
+var sunken := false:
+	set(v):
+		if v != sunken:
+			sunken = v
+			queue_redraw()
+## Text linksbündig statt mittig
+var align_left := false
 var _down := false
 var _hover := false
 
@@ -44,12 +52,14 @@ func _gui_input(event: InputEvent) -> void:
 
 func _draw() -> void:
 	var r := Rect2(Vector2.ZERO, size)
-	Win98.bevel(self, r, not _down)
-	var f := Flow.font_ui_bold if bold else Flow.font_ui
-	var off := Vector2(1, 1) if _down else Vector2.ZERO
+	var down := _down or sunken
+	Win98.bevel(self, r, not down, Color("d8d8d8") if sunken else Win98.FACE)
+	var f := Flow.font_ui_bold if bold or sunken else Flow.font_ui
+	var off := Vector2(1, 1) if down else Vector2.ZERO
 	var ts := f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
-	var pos := Vector2((size.x - ts.x) * 0.5, (size.y + f.get_ascent(font_size) - f.get_descent(font_size)) * 0.5) + off
-	draw_string(f, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.BLACK)
+	var x := 8.0 if align_left else (size.x - ts.x) * 0.5
+	var pos := Vector2(x, (size.y + f.get_ascent(font_size) - f.get_descent(font_size)) * 0.5) + off
+	draw_string(f, pos, text, HORIZONTAL_ALIGNMENT_LEFT, size.x - x - 4, font_size, Color.BLACK)
 	if has_focus():
 		var fr := r.grow(-4)
 		for i in range(int(fr.position.x), int(fr.end.x), 2):

@@ -32,9 +32,16 @@ var status_left: Label
 var balloon: PanelContainer
 var tray_env: Label
 var clock: Label
-var badge: Label
 var taskbar_row: HBoxContainer
-var task_mail: W98Button
+var task_spacer: Control
+var start_btn: W98Button
+var start_menu: StartMenu
+var fs := DeskFS.new()
+var icons: IconView
+var win_layer: Control
+var tasks := {}          # Fenster -> Knopf in der Taskleiste
+var apps := {}           # "web", "lol", "cs" -> Fenster
+var file_wins := {}      # Ordner- oder Datei-id -> Fenster
 var board: ChessBoard
 var moves_label: Label
 var chess_status: Label
@@ -51,9 +58,21 @@ func _ready() -> void:
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 	_build_icons()
-	_build_mail_window()
+	win_layer = Control.new()
+	win_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	win_layer.offset_bottom = -38
+	win_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(win_layer)
 	_build_taskbar()
+	_build_mail_window()
 	_build_balloon()
+	start_menu = StartMenu.new()
+	start_menu.visible = false
+	start_menu.chosen.connect(func(k):
+		_toggle_start(false)
+		_open_key(k))
+	add_child(start_menu)
+	fs.changed.connect(_on_fs_changed)
 	# Röhrenmonitor: feine Scanlines und Vignette über allem
 	var crt := ColorRect.new()
 	crt.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -81,14 +100,18 @@ void fragment() {
 	_render_rows()
 	_show_mail(1)
 	mail_win.visible = false
-	task_mail.visible = false
 	get_tree().create_timer(1.2).timeout.connect(func(): status_left.text = "Nachrichten werden abgerufen …")
 	get_tree().create_timer(2.6).timeout.connect(_deliver)
 	# Entwicklerhilfe: `--demo=mail`, `--demo=chess` oder `--demo=win` springt direkt an eine Stelle
 	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--open="):
+			for k in arg.trim_prefix("--open=").split(","):
+				_open_key.call_deferred(k if k.contains(":") or k.substr(1).is_valid_int() else "sys:" + k)
 		match arg:
 			"--demo=mail":
 				get_tree().create_timer(3.0).timeout.connect(_open_tet_mail)
+			"--demo=start":
+				_toggle_start.call_deferred(true)
 			"--demo=welcome":
 				_deliver.call_deferred()
 				get_tree().create_timer(0.5).timeout.connect(_accept)
@@ -111,7 +134,25 @@ func _unhandled_input(event: InputEvent) -> void:
 		Flow.goto("world")
 
 
+func _input(event: InputEvent) -> void:
+	# Klick irgendwo: Startmenü schließen und das angeklickte Fenster nach vorne holen
+	if event is InputEventMouseButton and event.pressed:
+		var p: Vector2 = event.position
+		if start_menu.visible and not start_menu.get_global_rect().has_point(p) and not start_btn.get_global_rect().has_point(p):
+			_toggle_start(false)
+		if p.y > size.y - 38:
+			return
+		var children := win_layer.get_children()
+		for i in range(children.size() - 1, -1, -1):
+			var w := children[i] as W98Window
+			if w and w.visible and w.get_global_rect().has_point(p):
+				if not w.active:
+					_focus(w)
+				return
+
+
 func _process(_delta: float) -> void:
+	_refresh_tasks()
 	var t := Time.get_time_dict_from_system()
 	clock.text = "%02d:%02d" % [t.hour, t.minute]
 	if tray_env.visible:
@@ -120,62 +161,146 @@ func _process(_delta: float) -> void:
 
 # ------------------------------------------------------------------ Desktop
 
+const SYSTEM_ICONS := [
+	{"key": "sys:pc", "title": "Arbeitsplatz", "kind": "pc"},
+	{"key": "sys:mail", "title": "Posteingang", "kind": "mail"},
+	{"key": "sys:games", "title": "Spiele", "kind": "games"},
+	{"key": "sys:lol", "title": "Liga der Legenden", "kind": "lol"},
+	{"key": "sys:cs", "title": "Counter-Spike GO", "kind": "cs"},
+	{"key": "sys:web", "title": "Internet", "kind": "web"},
+	{"key": "sys:trash", "title": "Papierkorb", "kind": "trash"},
+]
+
+
 func _build_icons() -> void:
-	var col := VBoxContainer.new()
-	col.position = Vector2(14, 14)
-	col.add_theme_constant_override("separation", 18)
-	add_child(col)
-	for spec in [["Arbeitsplatz", "pc"], ["Posteingang", "mail"], ["Spiele", "folder"], ["Papierkorb", "trash"]]:
-		var icon := DesktopIcon.new()
-		icon.title = spec[0]
-		icon.kind = spec[1]
-		icon.opened.connect(_open_icon.bind(spec[1]))
-		col.add_child(icon)
-		if spec[1] == "mail":
-			badge = Win98.label("1", 11, Color.WHITE, true)
-			var bs := StyleBoxFlat.new()
-			bs.bg_color = Color("e00000")
-			bs.set_corner_radius_all(8)
-			bs.content_margin_left = 5
-			bs.content_margin_right = 5
-			badge.add_theme_stylebox_override("normal", bs)
-			badge.position = Vector2(52, -4)
-			badge.visible = false
-			icon.add_child(badge)
+	icons = IconView.new()
+	icons.fs = fs
+	icons.system = SYSTEM_ICONS
+	icons.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	icons.offset_bottom = -38
+	icons.opened.connect(_open_key)
+	add_child(icons)
 
 
-func _open_icon(kind: String) -> void:
-	match kind:
-		"mail":
+## Öffnet ein Desktop-Symbol, einen Startmenü-Eintrag oder eine eigene Datei („i“ + id).
+func _open_key(key: String) -> void:
+	match key:
+		"sys:mail", "mail":
 			_open_mail()
-		"pc":
+		"sys:web", "web":
+			_open_app("web")
+		"sys:lol", "lol":
+			_open_app("lol")
+		"sys:cs", "cs":
+			_open_app("cs")
+		"sys:pc":
 			_msg("Arbeitsplatz", "Laufwerk C: 3 TB Spielstände. Laufwerk D: noch mehr Spielstände. Freier Speicher: 0 Byte.")
-		"folder":
+		"sys:games", "games":
 			_msg("Spiele", "Der Ordner enthält 1.247 Spiele. Status: alle durchgespielt, alle auf Platz 1.")
-		"trash":
-			_msg("Papierkorb", "Der Papierkorb ist leer. Verlorene Partien gibt es keine.")
+		"sys:trash":
+			_msg("Papierkorb", ("%d gelöschte Objekte. Der Papierkorb hat sie schon verdaut. Verlorene Partien sind keine dabei." % fs.trashed) if fs.trashed else "Der Papierkorb ist leer. Verlorene Partien gibt es keine.")
+		"help":
+			_msg("Hilfe", "Hilfe? 「　」 braucht keine Hilfe.")
+		"shutdown":
+			_msg("Beenden", "Herunterfahren abgebrochen: Es gibt noch Gegner, die nicht verloren haben.")
+		"newfolder":
+			icons.create_item("folder")
+		"newtext":
+			icons.create_item("text")
+		_:
+			var id := key.trim_prefix("i")
+			if fs.items.has(id):
+				if fs.items[id]["type"] == "folder":
+					_open_folder(id)
+				else:
+					_open_text(id)
 
 
 func _msg(title: String, text: String) -> void:
 	var w := W98Window.new()
 	w.title = title
-	w.size = Vector2(380, 150)
-	w.position = (size - w.size) * 0.5
+	w.resizable = false
+	w.minimizable = false
+	w.size = Vector2(400, 160)
+	w.position = (win_layer.size - w.size) * 0.5
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 12)
 	w.content.add_child(v)
 	var l := Win98.label(text, 13)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(340, 0)
+	l.custom_minimum_size = Vector2(360, 0)
 	v.add_child(l)
 	var ok := Win98.button("OK")
 	ok.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	v.add_child(ok)
 	ok.pressed.connect(w.queue_free)
-	w.closed.connect(w.queue_free)
-	add_child(w)
-	_raise_overlays()
+	_register(w, false, false)
+	_focus(w)
+	Flow.play("blip", -8, 0.8)
 	ok.grab_focus()
+
+
+# ------------------------------------------------------------------ Fenster und Taskleiste
+
+## Nimmt ein Fenster in die Verwaltung auf. persistent: Schließen versteckt es nur.
+func _register(w: W98Window, persistent: bool, with_task := true) -> void:
+	win_layer.add_child(w)
+	w.closed.connect(func():
+		_remove_task(w)
+		if persistent:
+			w.visible = false
+		else:
+			w.queue_free())
+	w.minimized.connect(func(): w.visible = false)
+	w.tree_exiting.connect(_remove_task.bind(w))
+	if with_task:
+		w.set_meta("task", true)
+
+
+func _show_window(w: W98Window) -> void:
+	w.visible = true
+	if w.has_meta("task") and not tasks.has(w):
+		var b := Win98.button("", 180)
+		b.align_left = true
+		b.custom_minimum_size = Vector2(180, 28)
+		b.pressed.connect(func():
+			if not w.visible:
+				w.visible = true
+				_focus(w)
+			elif w.active:
+				w.visible = false
+			else:
+				_focus(w))
+		taskbar_row.add_child(b)
+		taskbar_row.move_child(b, task_spacer.get_index())
+		tasks[w] = b
+	_focus(w)
+
+
+func _remove_task(w: W98Window) -> void:
+	if tasks.has(w):
+		tasks[w].queue_free()
+		tasks.erase(w)
+
+
+func _focus(w: W98Window) -> void:
+	for c in win_layer.get_children():
+		if c is W98Window:
+			c.active = c == w
+	w.move_to_front()
+
+
+func _refresh_tasks() -> void:
+	var top: W98Window = null
+	for c in win_layer.get_children():
+		if c is W98Window and c.visible:
+			top = c
+	for w in tasks:
+		var b: W98Button = tasks[w]
+		var t: String = w.get_meta("task_label") if w.has_meta("task_label") else w.title.get_slice(" – ", 0)
+		if b.text != t:
+			b.text = t
+		b.sunken = w.visible and w == top and w.active
 
 
 func _build_taskbar() -> void:
@@ -191,16 +316,13 @@ func _build_taskbar() -> void:
 	taskbar_row.offset_bottom = -5
 	taskbar_row.add_theme_constant_override("separation", 4)
 	bar.add_child(taskbar_row)
-	var start := Win98.button("♟ Start", 84)
-	start.bold = true
-	start.pressed.connect(func(): _msg("Start", "Herunterfahren abgebrochen: Es gibt noch Gegner, die nicht verloren haben."))
-	taskbar_row.add_child(start)
-	task_mail = Win98.button("✉ Posteingang", 190)
-	task_mail.pressed.connect(func(): mail_win.visible = not mail_win.visible; mail_win.move_to_front())
-	taskbar_row.add_child(task_mail)
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	taskbar_row.add_child(spacer)
+	start_btn = Win98.button("♟ Start", 84)
+	start_btn.bold = true
+	start_btn.pressed.connect(func(): _toggle_start(not start_menu.visible))
+	taskbar_row.add_child(start_btn)
+	task_spacer = Control.new()
+	task_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	taskbar_row.add_child(task_spacer)
 	var tray := HBoxContainer.new()
 	tray.add_theme_constant_override("separation", 10)
 	taskbar_row.add_child(tray)
@@ -238,9 +360,176 @@ func _build_balloon() -> void:
 	add_child(balloon)
 
 
-func _raise_overlays() -> void:
-	if crack_layer:
-		crack_layer.move_to_front()
+func _toggle_start(on: bool) -> void:
+	start_menu.visible = on
+	start_btn.sunken = on
+	if on:
+		start_menu.reset_size()
+		start_menu.position = Vector2(2, size.y - 38 - start_menu.size.y)
+		start_menu.move_to_front()
+		Flow.play("blip", -10)
+
+
+# ------------------------------------------------------------------ Programme
+
+func _open_app(kind: String) -> void:
+	if apps.has(kind):
+		_show_window(apps[kind])
+		return
+	var w := W98Window.new()
+	match kind:
+		"web":
+			w.title = "NetSurfer 98"
+			w.icon_color = Color("1a5fb4")
+			w.size = Vector2(1000, 660)
+			w.min_size = Vector2(560, 320)
+			var browser := NetSurfer.new()
+			browser.title_changed.connect(func(t): w.title = t)
+			browser.secret.connect(_secret_skip)
+			w.content.add_child(browser)
+		"lol":
+			w.title = "Liga der Legenden – Client"
+			w.icon_color = Color("c8aa6e")
+			w.size = Vector2(1180, 640)
+			w.min_size = Vector2(900, 480)
+			w.content.add_child(Launchers.build_lol())
+		"cs":
+			w.title = "Counter-Spike: GO"
+			w.icon_color = Color("de9b35")
+			w.size = Vector2(1120, 620)
+			w.min_size = Vector2(860, 460)
+			w.content.add_child(Launchers.build_cs())
+	w.set_meta("task_label", {"web": "NetSurfer 98", "lol": "Liga der Legenden", "cs": "Counter-Spike GO"}[kind])
+	w.size = w.size.min(win_layer.size - Vector2(20, 10))
+	w.position = ((win_layer.size - w.size) * 0.5 + Vector2(apps.size() * 28 - 30, apps.size() * 22 - 20)).max(Vector2(4, 4))
+	apps[kind] = w
+	_register(w, true)
+	_show_window(w)
+
+
+func _secret_skip() -> void:
+	Flow.goto("world", Color.WHITE, 0.5, 0.8)
+
+
+func _open_folder(id: String) -> void:
+	if file_wins.has(id):
+		_show_window(file_wins[id])
+		return
+	var w := W98Window.new()
+	w.size = Vector2(620, 420)
+	w.min_size = Vector2(360, 240)
+	w.position = Vector2(220, 80) + Vector2(file_wins.size() * 26, file_wins.size() * 22)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 4)
+	w.content.add_child(v)
+	var tools := HBoxContainer.new()
+	tools.add_theme_constant_override("separation", 4)
+	v.add_child(tools)
+	var path := Win98.label("", 12)
+	var view := IconView.new()
+	view.fs = fs
+	view.parent_id = id
+	view.light_text = false
+	view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var update := func():
+		if not fs.items.has(view.parent_id):
+			return
+		w.title = fs.items[view.parent_id]["name"]
+		path.text = "Adresse:  " + fs.path_of(view.parent_id)
+	var nav := func(target: String):
+		file_wins.erase(view.parent_id)
+		view.parent_id = target
+		file_wins[target] = w
+		view.selected.clear()
+		view.refresh()
+		update.call()
+	var up := Win98.button("↑ Nach oben", 100)
+	up.pressed.connect(func():
+		var parent: String = fs.items[view.parent_id]["parent"]
+		if parent != "desk":
+			nav.call(parent))
+	tools.add_child(up)
+	var nf := Win98.button("Neuer Ordner", 110)
+	nf.pressed.connect(func(): view.create_item("folder"))
+	tools.add_child(nf)
+	var nt := Win98.button("Neues Textdokument", 150)
+	nt.pressed.connect(func(): view.create_item("text"))
+	tools.add_child(nt)
+	v.add_child(path)
+	var frame := PanelContainer.new()
+	frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var sb := Win98.sunken_box()
+	sb.set_content_margin_all(2)
+	frame.add_theme_stylebox_override("panel", sb)
+	v.add_child(frame)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	frame.add_child(scroll)
+	scroll.add_child(view)
+	var count := Win98.label("", 12)
+	v.add_child(count)
+	view.opened.connect(func(k: String):
+		var cid := k.trim_prefix("i")
+		if fs.items.has(cid) and fs.items[cid]["type"] == "folder":
+			nav.call(cid)
+		else:
+			_open_key(k))
+	fs.changed.connect(func():
+		if is_instance_valid(count) and fs.items.has(view.parent_id):
+			count.text = "%d Objekt(e)" % fs.children(view.parent_id).size())
+	count.text = "%d Objekt(e)" % fs.children(id).size()
+	w.set_meta("folder_view", view)
+	file_wins[id] = w
+	w.tree_exiting.connect(func(): file_wins.erase(view.parent_id))
+	update.call()
+	_register(w, false)
+	_show_window(w)
+
+
+func _open_text(id: String) -> void:
+	if file_wins.has(id):
+		_show_window(file_wins[id])
+		return
+	var w := W98Window.new()
+	w.title = "%s – Editor" % fs.items[id]["name"]
+	w.icon_color = Color.WHITE
+	w.size = Vector2(560, 400)
+	w.position = Vector2(300, 120) + Vector2(file_wins.size() * 26, file_wins.size() * 22)
+	var te := TextEdit.new()
+	te.text = fs.items[id]["content"]
+	te.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+	te.add_theme_font_override("font", Flow.font_ui)
+	te.add_theme_font_size_override("font_size", 14)
+	te.add_theme_color_override("font_color", Color.BLACK)
+	te.add_theme_color_override("caret_color", Color.BLACK)
+	te.add_theme_color_override("selection_color", Win98.NAVY)
+	te.add_theme_color_override("font_selected_color", Color.WHITE)
+	var sb := Win98.sunken_box()
+	te.add_theme_stylebox_override("normal", sb)
+	te.add_theme_stylebox_override("focus", sb)
+	te.text_changed.connect(func():
+		if fs.items.has(id):
+			fs.items[id]["content"] = te.text
+			fs.save(true))
+	w.content.add_child(te)
+	file_wins[id] = w
+	w.tree_exiting.connect(func(): file_wins.erase(id))
+	_register(w, false)
+	_show_window(w)
+	te.grab_focus()
+
+
+## Gelöschte Ordner und Dateien schließen ihre Fenster; Titel folgen dem neuen Namen.
+func _on_fs_changed() -> void:
+	for id in file_wins.keys():
+		var w: W98Window = file_wins[id]
+		if not fs.items.has(id):
+			w.queue_free()
+		elif fs.items[id]["type"] == "text":
+			w.title = "%s – Editor" % fs.items[id]["name"]
+		else:
+			w.title = fs.items[id]["name"]
 
 
 # ------------------------------------------------------------------ Posteingang
@@ -250,8 +539,7 @@ func _build_mail_window() -> void:
 	mail_win.title = "Posteingang – PostFach 98"
 	mail_win.size = Vector2(820, 680)
 	mail_win.position = Vector2(150, 34)
-	mail_win.closed.connect(func(): mail_win.visible = false)
-	add_child(mail_win)
+	_register(mail_win, true)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 4)
 	mail_win.content.add_child(v)
@@ -330,11 +618,10 @@ func _render_rows() -> void:
 		mail_rows.add_child(row)
 	var unread := mails.filter(func(m): return m["unread"]).size()
 	mail_win.title = "Posteingang%s – PostFach 98" % (" (%d)" % unread if unread else "")
-	task_mail.text = "✉ Posteingang" + (" (%d)" % unread if unread else "")
 	status_left.text = "%d Nachrichten, %d ungelesen" % [mails.size(), unread]
-	if badge:
-		badge.text = str(unread)
-		badge.visible = unread > 0
+	if icons:
+		icons.badges["sys:mail"] = unread
+		icons.queue_redraw()
 
 
 func _show_mail(i: int) -> void:
@@ -396,10 +683,7 @@ func _deliver() -> void:
 
 
 func _open_mail() -> void:
-	mail_win.visible = true
-	task_mail.visible = true
-	mail_win.move_to_front()
-	_raise_overlays()
+	_show_window(mail_win)
 
 
 func _open_tet_mail() -> void:
@@ -414,8 +698,7 @@ func _open_tet_mail() -> void:
 
 func _accept() -> void:
 	if chess_win:
-		chess_win.visible = true
-		chess_win.move_to_front()
+		_show_window(chess_win)
 		return
 	var banner := WelcomeBanner.new()
 	banner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -432,7 +715,9 @@ func _open_chess() -> void:
 	chess_win.closable = false
 	chess_win.size = Vector2(760, 560)
 	chess_win.position = Vector2((size.x - 760) * 0.5, 20)
-	add_child(chess_win)
+	chess_win.min_size = Vector2(620, 460)
+	_register(chess_win, true)
+	_show_window(chess_win)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	chess_win.content.add_child(row)
@@ -498,7 +783,6 @@ func _open_chess() -> void:
 		rematch_btn.visible = false
 		board.reset())
 	board.reset()
-	_raise_overlays()
 
 
 ## Sieg: Riss durchs Brett, dann über den ganzen Bildschirm, dann Wechsel in die 3D-Szene.
@@ -576,52 +860,6 @@ class MailRow extends Control:
 		for i in 4:
 			draw_string(font, Vector2(x + 6, 17), cols[i], HORIZONTAL_ALIGNMENT_LEFT, widths[i] - 10, 13, col)
 			x += widths[i]
-
-
-class DesktopIcon extends Control:
-	signal opened
-	var title := ""
-	var kind := ""
-	var _sel := false
-	var _last_click := 0
-
-	func _ready() -> void:
-		custom_minimum_size = Vector2(84, 74)
-		mouse_filter = Control.MOUSE_FILTER_STOP
-
-	func _gui_input(event: InputEvent) -> void:
-		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			var now := Time.get_ticks_msec()
-			if event.double_click or now - _last_click < 400:
-				opened.emit()
-			_last_click = now
-			_sel = true
-			queue_redraw()
-
-	func _draw() -> void:
-		var c := Vector2(size.x * 0.5, 22)
-		match kind:
-			"pc":
-				draw_rect(Rect2(c + Vector2(-18, -16), Vector2(36, 26)), Win98.FACE)
-				draw_rect(Rect2(c + Vector2(-14, -12), Vector2(28, 18)), Win98.NAVY)
-				draw_rect(Rect2(c + Vector2(-10, 12), Vector2(20, 5)), Win98.SHADE)
-			"mail":
-				draw_rect(Rect2(c + Vector2(-18, -12), Vector2(36, 24)), Color.WHITE)
-				draw_polyline(PackedVector2Array([c + Vector2(-18, -12), c + Vector2(0, 2), c + Vector2(18, -12)]), Color.BLACK, 1.5)
-				draw_rect(Rect2(c + Vector2(-18, -12), Vector2(36, 24)), Color.BLACK, false, 1.0)
-			"folder":
-				draw_rect(Rect2(c + Vector2(-18, -10), Vector2(36, 24)), Color("ffd36b"))
-				draw_rect(Rect2(c + Vector2(-18, -14), Vector2(14, 6)), Color("ffd36b"))
-				draw_string(Flow.font_ui, c + Vector2(-6, 8), "♟", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.BLACK)
-			"trash":
-				draw_rect(Rect2(c + Vector2(-12, -10), Vector2(24, 26)), Color("dfdfdf"))
-				draw_rect(Rect2(c + Vector2(-15, -14), Vector2(30, 5)), Win98.FACE)
-		var font := Flow.font_ui
-		var w := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
-		var tr := Rect2(Vector2((size.x - w) * 0.5 - 3, 46), Vector2(w + 6, 18))
-		if _sel:
-			draw_rect(tr, Win98.NAVY)
-		draw_string(font, Vector2(tr.position.x + 3, 60), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
 
 
 ## Riss-Linien, die von einem Punkt aus über den Bildschirm wachsen.
@@ -749,3 +987,60 @@ class WelcomeBanner extends Control:
 			var p2 := Vector2((size.x - w2) * 0.5, size.y * 0.5 + fs * 0.25 + 40)
 			draw_string_outline(Flow.font_ui_bold, p2, en, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, 6, Color("2b3f8e", appear))
 			draw_string(Flow.font_ui_bold, p2, en, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 1, 1, appear))
+
+
+
+## Startmenü mit senkrechtem Band „「　」 OS 98“.
+class StartMenu extends PanelContainer:
+	signal chosen(key: String)
+	const ENTRIES := [["✉  Posteingang", "mail"], ["♟  Spiele", "games"], ["◍  Internet", "web"], ["⚔  Liga der Legenden", "lol"], ["⌖  Counter-Spike GO", "cs"], ["?  Hilfe", "help"], ["", ""], ["＋  Neuer Ordner", "newfolder"], ["✎  Neues Textdokument", "newtext"], ["", ""], ["⏻  Beenden …", "shutdown"]]
+
+	func _ready() -> void:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Win98.FACE
+		sb.border_color = Win98.DARK
+		sb.border_width_right = 2
+		sb.border_width_bottom = 2
+		sb.border_width_left = 1
+		sb.border_width_top = 1
+		sb.content_margin_left = 30
+		sb.content_margin_top = 3
+		sb.content_margin_bottom = 3
+		sb.content_margin_right = 3
+		add_theme_stylebox_override("panel", sb)
+		var v := VBoxContainer.new()
+		v.add_theme_constant_override("separation", 0)
+		add_child(v)
+		for e in ENTRIES:
+			if e[0] == "":
+				var sep := HSeparator.new()
+				v.add_child(sep)
+				continue
+			var b := Button.new()
+			b.text = e[0]
+			b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			b.custom_minimum_size = Vector2(230, 32)
+			b.add_theme_font_override("font", Flow.font_ui)
+			b.add_theme_font_size_override("font_size", 14)
+			b.add_theme_color_override("font_color", Color.BLACK)
+			b.add_theme_color_override("font_hover_color", Color.WHITE)
+			b.add_theme_color_override("font_pressed_color", Color.WHITE)
+			b.add_theme_color_override("font_focus_color", Color.BLACK)
+			var flat := StyleBoxEmpty.new()
+			flat.content_margin_left = 10
+			var hover := StyleBoxFlat.new()
+			hover.bg_color = Win98.NAVY
+			hover.content_margin_left = 10
+			b.add_theme_stylebox_override("normal", flat)
+			b.add_theme_stylebox_override("focus", flat)
+			b.add_theme_stylebox_override("hover", hover)
+			b.add_theme_stylebox_override("pressed", hover)
+			b.pressed.connect(func(): chosen.emit(e[1]))
+			v.add_child(b)
+
+	func _draw() -> void:
+		draw_rect(Rect2(3, 3, 24, size.y - 6), Win98.SHADE.lerp(Win98.NAVY, 0.7))
+		draw_set_transform(Vector2(21, size.y - 10), -PI / 2)
+		draw_string(Flow.font_ui_bold, Vector2.ZERO, "「　」", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.WHITE)
+		draw_string(Flow.font_ui, Vector2(52, 0), "OS 98", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("c0c0c0"))
+		draw_set_transform(Vector2.ZERO)
