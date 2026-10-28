@@ -8,7 +8,8 @@
 #   curl -LO https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx
 #   curl -LO https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin
 # Aufruf (im Ordner mit den beiden Modelldateien):
-#   python tools/make_teto_voice.py PFAD/ZUM/PROJEKT
+#   python tools/make_teto_voice.py PFAD/ZUM/PROJEKT                                   (Sturz, teto_XX.ogg)
+#   python tools/make_teto_voice.py PFAD/ZUM/PROJEKT scripts/tutorial.gd tutorial      (Training, tutorial_XX.ogg)
 import re
 import sys
 from pathlib import Path
@@ -20,11 +21,15 @@ from misaki import ja
 
 # Lesungen, die die Aussprache-Erkennung sonst falsch wählt
 FIX = {"四つ": "よっつ", "六つ": "むっつ", "八つ": "やっつ"}
+# Lateinische Buchstaben (Tastennamen) spricht das Modell sonst nicht: als Katakana ausschreiben
+LETTERS = {"A": "エー", "D": "ディー", "E": "イー", "F": "エフ", "M": "エム", "Q": "キュー", "S": "エス", "W": "ダブリュー"}
 MIX = {"jf_alpha": 0.45, "jf_tebukuro": 0.55}
 SPEED = 1.04
 
 project = Path(sys.argv[1] if len(sys.argv) > 1 else ".")
-source = (project / "scripts/intro/fall_sequence.gd").read_text(encoding="utf-8")
+script = sys.argv[2] if len(sys.argv) > 2 else "scripts/intro/fall_sequence.gd"
+prefix = sys.argv[3] if len(sys.argv) > 3 else "teto"
+source = (project / script).read_text(encoding="utf-8")
 # Jede Zeile in LINES endet mit dem japanischen Text als letztem String
 lines = re.findall(r'^\t\t"([^"]*[ぁ-んァ-ン][^"]*)"\],?$', source, re.M)
 out = project / "assets/audio/teto"
@@ -37,6 +42,7 @@ for i, line in enumerate(lines):
     text = line
     for a, b in FIX.items():
         text = text.replace(a, b)
+    text = re.sub(r"[A-Z]", lambda m: LETTERS.get(m.group(0), m.group(0)), text)
     phonemes = g2p(text)
     phonemes = phonemes if isinstance(phonemes, str) else phonemes[0]
     audio, sr = kokoro.create(phonemes, voice=style, speed=SPEED, is_phonemes=True)
@@ -44,5 +50,5 @@ for i, line in enumerate(lines):
     loud = np.where(np.abs(a) > 0.01)[0]
     a = a[max(0, loud[0] - int(0.03 * sr)): loud[-1] + int(0.12 * sr)]
     a = a / np.abs(a).max() * 0.89
-    sf.write(out / f"teto_{i:02d}.ogg", a, sr, format="OGG", subtype="VORBIS")
+    sf.write(out / f"{prefix}_{i:02d}.ogg", a, sr, format="OGG", subtype="VORBIS")
     print(f"{i:2d}  {len(a) / sr:4.1f} s  {line}")

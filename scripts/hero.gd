@@ -12,12 +12,19 @@ extends CharacterBody3D
 
 const WALK_SPEED := 3.3
 const RUN_SPEED := 6.2
+const JUMP_SPEED := 6.4
+const GRAVITY := 20.0
+
+signal jumped
 
 var model: Node3D
 var anim: AnimationPlayer
 var _idle := ""
 var _walk := ""
 var _run := ""
+var _jump := ""
+## Wie viele Sprünge die Figur insgesamt gemacht hat (z. B. für das Tutorial)
+var jumps := 0
 var _current := ""
 
 
@@ -92,7 +99,7 @@ func _setup_animations() -> void:
 		anim = players[0]
 	_collect_animations()
 	for i in anim_sources.size():
-		if _idle != "" and _walk != "" and _run != "":
+		if _idle != "" and _walk != "" and _run != "" and _jump != "":
 			break
 		var src := anim_sources[i].instantiate()
 		var src_players := src.find_children("*", "AnimationPlayer", true, false)
@@ -123,8 +130,10 @@ func _collect_animations() -> void:
 			_walk = n
 		elif lower.begins_with("run") and _run == "":
 			_run = n
+		elif lower.begins_with("jump") and _jump == "":
+			_jump = n
 		var a := anim.get_animation(n)
-		a.loop_mode = Animation.LOOP_LINEAR
+		a.loop_mode = Animation.LOOP_NONE if lower.begins_with("jump") else Animation.LOOP_LINEAR
 		_strip_root_motion(a)
 
 
@@ -152,11 +161,25 @@ func play_state(state: String) -> void:
 		name = _walk
 	elif state == "run":
 		name = _run
+	elif state == "jump":
+		name = _jump
 	if name == "" or name == _current:
 		return
 	_current = name
-	anim.play(name, 0.22)
-	anim.speed_scale = 1.3 if state == "walk" else 1.0
+	anim.play(name, 0.12 if state == "jump" else 0.22)
+	anim.speed_scale = {"walk": 1.3, "jump": 1.5}.get(state, 1.0)
+
+
+## Springt ab, wenn die Figur auf dem Boden steht.
+func jump() -> bool:
+	if not is_on_floor():
+		return false
+	velocity.y = JUMP_SPEED
+	jumps += 1
+	_current = ""
+	play_state("jump")
+	jumped.emit()
+	return true
 
 
 ## Bewegt die Figur in Weltrichtung (Länge 0–1).
@@ -170,12 +193,16 @@ func drive(direction: Vector3, sprint: bool, delta: float) -> void:
 		velocity.z = dir.z * speed
 		var target := atan2(dir.x, dir.z)
 		model.rotation.y = lerp_angle(model.rotation.y, target, minf(1.0, delta * 12.0))
-		play_state("run" if sprint else "walk")
 	else:
 		velocity.x = 0.0
 		velocity.z = 0.0
-		play_state("idle")
-	velocity.y = 0.0 if is_on_floor() else velocity.y - 20.0 * delta
+	var airborne := not is_on_floor() or velocity.y > 0.0
+	if airborne:
+		velocity.y -= GRAVITY * delta
+	else:
+		velocity.y = -0.5   # leicht an den Boden drücken, damit is_on_floor stabil bleibt
+	if not airborne or _jump == "":
+		play_state(("run" if sprint else "walk") if amount > 0.1 else "idle")
 	move_and_slide()
 
 

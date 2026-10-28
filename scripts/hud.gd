@@ -103,7 +103,7 @@ func _ready() -> void:
 	tw.tween_property(title_box, "modulate:a", 0.0, 1.2)
 
 	# Steuerungshilfe
-	var help := _label(root, "WASD laufen · Shift sprinten · Maus ziehen: Kamera · Mausrad: Zoom · E interagieren", 13, MUTE)
+	var help := _label(root, "WASD laufen · Shift sprinten · Leertaste springen · Maus ziehen: Kamera · Mausrad: Zoom · Q wechseln · E interagieren · F1 Tutorial", 13, MUTE)
 	help.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 16)
 	help.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	help.grow_vertical = Control.GROW_DIRECTION_BEGIN
