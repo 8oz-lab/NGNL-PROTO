@@ -1,8 +1,11 @@
 extends Node3D
 ## Das Grundstück am Stadtrand von Elkia: Gelände, Parzellen, Hütte, Nachbarschaft, Figuren und Steuerung.
 
-const SORA_SCENE := preload("res://assets/models/characters/sora.glb")
-const SHIRO_SCENE := preload("res://assets/models/characters/shiro.glb")
+const SORA_SCENE := preload("res://assets/models/characters/sora_neu.glb")
+const SHIRO_SCENE := preload("res://assets/models/characters/shiro_neu.glb")
+# Ältere Modelle mit Mixamo-Animationen: liefern, was den neuen Modellen fehlt
+const SORA_ANIMS := preload("res://assets/models/characters/sora.glb")
+const SHIRO_ANIMS := preload("res://assets/models/characters/shiro.glb")
 const QUEEN_SCENE := preload("res://assets/models/props/chess_queen.glb")
 const GROUND_SHADER := preload("res://assets/shaders/ground.gdshader")
 
@@ -392,12 +395,13 @@ func _build_grass() -> void:
 # ---------------------------------------------------------------- Figuren
 
 func _spawn_heroes() -> void:
-	for spec in [["Sora", "Liest Menschen", SORA_SCENE, 1.72, Vector3(0.7, 0, 12.2)], ["Shiro", "Rechnet alles durch", SHIRO_SCENE, 1.42, Vector3(-0.7, 0, 12.6)]]:
+	for spec in [["Sora", "Liest Menschen", SORA_SCENE, 1.72, Vector3(0.7, 0, 12.2), SORA_ANIMS], ["Shiro", "Rechnet alles durch", SHIRO_SCENE, 1.42, Vector3(-0.7, 0, 12.6), SHIRO_ANIMS]]:
 		var hero := Hero.new()
 		hero.display_name = spec[0]
 		hero.skill = spec[1]
 		hero.model_scene = spec[2]
 		hero.height = spec[3]
+		hero.anim_sources = [spec[5]]
 		hero.position = spec[4]
 		add_child(hero)
 		hero.model.rotation.y = PI

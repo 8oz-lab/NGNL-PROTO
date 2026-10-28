@@ -1,0 +1,37 @@
+[remap]
+
+importer="texture"
+type="CompressedTexture2D"
+uid="uid://dk4xsoti7qui6"
+path="res://.godot/imported/shiro_neu_tripo_rgb_efaa28d1-0d7d-4602-a41e-f8449f27eaf1.jpg-6c5f152e309553e26b348e830a87bfa4.ctex"
+metadata={
+"vram_texture": false
+}
+generator_parameters={
+"md5": "00079b5d2cdc39d07ef2c1c8270dc9a4"
+}
+
+[deps]
+
+source_file="res://assets/models/characters/shiro_neu_tripo_rgb_efaa28d1-0d7d-4602-a41e-f8449f27eaf1.jpg"
+dest_files=["res://.godot/imported/shiro_neu_tripo_rgb_efaa28d1-0d7d-4602-a41e-f8449f27eaf1.jpg-6c5f152e309553e26b348e830a87bfa4.ctex"]
+
+[params]
+
+compress/mode=0
+compress/high_quality=false
+compress/lossy_quality=0.7
+compress/hdr_compression=1
+compress/normal_map=0
+compress/channel_pack=0
+mipmaps/generate=true
+mipmaps/limit=-1
+roughness/mode=0
+roughness/src_normal=""
+process/fix_alpha_border=true
+process/premult_alpha=false
+process/normal_map_invert_y=false
+process/hdr_as_srgb=false
+process/hdr_clamp_exposure=false
+process/size_limit=0
+detect_3d/compress_to=1

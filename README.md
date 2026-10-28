@@ -47,7 +47,8 @@ Das Spiel beginnt wie im Anime auf einem alten Windows-Desktop:
 | `scripts/game_state.gd` | Autoload `GameState`: Münzen, Parzellen, Speichern, Tastenbelegung |
 | `scripts/toon.gd` | Toon-Materialien mit Umrisslinie |
 | `assets/shaders/` | Toon-Shader (3 Lichtstufen) und Umriss-Shader |
-| `assets/models/` | GLB-Modelle aus Tripo (Figuren mit Mixamo-Rig) |
+| `assets/models/` | GLB-Modelle aus Tripo. Figuren: `sora_neu.glb`, `shiro_neu.glb`; fehlende Animationen kommen per Humanoid-Retargeting (`mixamo_bone_map.tres`) aus `sora.glb`/`shiro.glb` |
+| `tools/fix_gltf_matrix.py` | Repariert GLB-Dateien, deren Knochen als Matrix gespeichert sind (sonst fällt das Skelett in Godot zusammen) |
 
 Der Spielstand wird beim Betreten der Hütte gespeichert (`user://save.json`).
 
