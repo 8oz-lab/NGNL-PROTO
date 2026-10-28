@@ -8,11 +8,20 @@ uniform bool use_texture = false;
 uniform vec2 uv_scale = vec2(1.0);
 uniform vec4 emission_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
 uniform float rim_strength : hint_range(0.0, 1.0) = 0.1;
+uniform bool use_vertex_color = false;
+#include "res://assets/shaders/sway.gdshaderinc"
+
+void vertex() {
+	VERTEX += sway_offset(VERTEX, MODEL_MATRIX);
+}
 
 void fragment() {
 	vec4 c = albedo;
 	if (use_texture) {
 		c *= texture(albedo_texture, UV * uv_scale);
+	}
+	if (use_vertex_color) {
+		c.rgb *= COLOR.rgb;
 	}
 	ALBEDO = c.rgb;
 	ROUGHNESS = 1.0;
