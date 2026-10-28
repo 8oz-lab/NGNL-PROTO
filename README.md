@@ -58,6 +58,8 @@ Auf dem Desktop gibt es außerdem:
 | `assets/shaders/` | Toon-Shader (3 Lichtstufen) und Umriss-Shader |
 | `assets/models/` | GLB-Modelle aus Tripo. Figuren: `sora_neu.glb`, `shiro_neu.glb`; fehlende Animationen kommen per Humanoid-Retargeting (`mixamo_bone_map.tres`) aus `sora.glb`/`shiro.glb` |
 | `assets/audio/teto/` | Tetos gesprochene Zeilen, erzeugt mit `tools/make_teto_voice.py` (Kokoro-TTS, Apache-2.0; Anleitung im Skript) |
+| `assets/models/trees/` | Baum-Modelle im Toon-Stil (Laubbaum, großer Laubbaum, Kirschbaum, Tanne, Birke, Busch), erzeugt mit `tools/make_trees.gd`; Vorschau: `tests/tree_preview.tscn` |
+| `assets/models/houses/` | Haus-Modelle (GLB) – jede Datei erscheint automatisch an der Straße; erzeugen mit `tools/tripo_houses.py` (Tripo-API: Schlüssel als Network secret für api.tripo3d.ai oder als `TRIPO_API_KEY`) |
 | `tools/fix_gltf_matrix.py` | Repariert GLB-Dateien, deren Knochen als Matrix gespeichert sind (sonst fällt das Skelett in Godot zusammen) |
 
 Der Spielstand wird beim Betreten der Hütte gespeichert (`user://save.json`).

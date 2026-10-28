@@ -46,5 +46,21 @@ static func apply_to(node: Node, outline := 0.008, tint := Color.WHITE) -> void:
 				tex = (src as BaseMaterial3D).albedo_texture
 				if tex == null:
 					col = (src as BaseMaterial3D).albedo_color * tint
-			mesh_instance.set_surface_override_material(i, mat(col, tex, Vector2.ONE, outline))
+			var m := mat(col, tex, Vector2.ONE, outline)
+			# Modelle mit Vertexfarben (z. B. die Bäume) färben über die Farbe pro Punkt
+			if mesh_instance.mesh.surface_get_format(i) & Mesh.ARRAY_FORMAT_COLOR:
+				m.set_shader_parameter("use_vertex_color", true)
+			mesh_instance.set_surface_override_material(i, m)
 		mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+
+
+## Lässt alle Toon-Materialien eines Modells oberhalb von „start“ (Modellhöhe) im Wind wiegen.
+static func set_sway(node: Node, amount: float, start: float) -> void:
+	for mi in node.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := mi as MeshInstance3D
+		for i in mesh_instance.get_surface_override_material_count():
+			var m := mesh_instance.get_surface_override_material(i) as ShaderMaterial
+			while m:
+				m.set_shader_parameter("sway", amount)
+				m.set_shader_parameter("sway_start", start)
+				m = m.next_pass as ShaderMaterial

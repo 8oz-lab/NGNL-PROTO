@@ -13,7 +13,17 @@ const PARCEL := 6.0          # Kantenlänge einer Parzelle in Metern
 const HALF := 9.0            # halbe Breite des Grundstücks (3 × 6 m)
 const FENCE := HALF + 0.4
 const ROOF_COLORS := [Color("3f5fae"), Color("b8443c"), Color("4a8c5a"), Color("7f56b8"), Color("c77e2c"), Color("2f8fa8")]
-const CROWN_COLORS := [Color("d96bb4"), Color("9a76d8"), Color("4fb892"), Color("6faf4c")]
+## Baum-Modelle (erzeugt mit tools/make_trees.gd): Szene, Höhe ab der die Krone im Wind wiegt, Stammbreite
+const TREES := {
+	"laubbaum": [preload("res://assets/models/trees/laubbaum.glb"), 2.3, 0.6],
+	"laubbaum_gross": [preload("res://assets/models/trees/laubbaum_gross.glb"), 3.0, 0.8],
+	"kirschbaum": [preload("res://assets/models/trees/kirschbaum.glb"), 2.0, 0.6],
+	"tanne": [preload("res://assets/models/trees/tanne.glb"), 1.2, 0.5],
+	"birke": [preload("res://assets/models/trees/birke.glb"), 2.4, 0.4],
+	"busch": [preload("res://assets/models/trees/busch.glb"), 0.2, 0.0],
+}
+## Mischung für den Waldrand: Art und Gewicht
+const FOREST_MIX := [["laubbaum", 30], ["laubbaum_gross", 18], ["tanne", 24], ["birke", 16], ["kirschbaum", 12]]
 
 var heroes: Array[Hero] = []
 var active := 0
@@ -50,6 +60,11 @@ func _ready() -> void:
 			var cap := preload("res://scripts/dev_capture.gd").new()
 			cap.output = arg.trim_prefix("--capture=")
 			add_child(cap)
+		elif arg.begins_with("--yaw="):
+			# Kamera für Testbilder drehen (Grad, 180 = Blick zur Straße)
+			rig.yaw = deg_to_rad(float(arg.trim_prefix("--yaw=")))
+		elif arg.begins_with("--zoom="):
+			rig.distance = float(arg.trim_prefix("--zoom="))
 
 
 # ---------------------------------------------------------------- Umgebung
@@ -204,7 +219,7 @@ func _build_plot() -> void:
 	# Büsche am Zaun
 	for i in 14:
 		var side := 1.0 if i % 2 else -1.0
-		_blob(Vector3(side * (FENCE + 0.9), 0.45, -8.0 + (i >> 1) * 2.4), 0.6 + _rng.randf() * 0.2, Color("5ab86a"))
+		_tree("busch", Vector3(side * (FENCE + 0.9), 0, -8.0 + (i >> 1) * 2.4), 0.8 + _rng.randf() * 0.35)
 
 
 func _fence(a: Vector3, b: Vector3) -> void:
@@ -262,22 +277,39 @@ func _build_hut() -> void:
 # ---------------------------------------------------------------- Nachbarschaft
 
 func _build_neighbourhood() -> void:
+	# Häuser aus assets/models/houses/ (z. B. von Tripo) ersetzen die ersten Häuser auf der anderen Straßenseite
+	var models := _house_models()
+	var slots := [4, 3, 5, 2, 6, 1, 7, 0, 8]   # von der Mitte (gegenüber dem Grundstück) nach außen
 	for i in 9:
+		var m := slots.find(i)
+		if m < models.size():
+			_model_house(models[m], Vector3(-40 + i * 10, 0, 24.5), Vector2(8.0, 6.5), PI)
+			continue
 		_house(Vector3(-40 + i * 10 + (_rng.randf() - 0.5) * 2, 0, 24), Vector3(6 + _rng.randf() * 2, 3.4 + _rng.randf() * 1.6, 5), ROOF_COLORS[i % 6], false)
 	for x in [-20.0, -32.0, 20.0, 32.0]:
 		_house(Vector3(x, 0, 6 + _rng.randf() * 4), Vector3(6, 3.6 + _rng.randf(), 5), ROOF_COLORS[int(x + 40) % 6], true)
 	for i in 7:
 		_house(Vector3(-30 + i * 10, 0, -22 - _rng.randf() * 3), Vector3(6 + _rng.randf() * 2, 3.6 + _rng.randf() * 1.8, 5), ROOF_COLORS[(i + 2) % 6], true)
 
-	for p in [Vector2(-13, -12), Vector2(13, -11), Vector2(-14, 4), Vector2(14, 2), Vector2(-12.5, 10), Vector2(12.5, 9.5), Vector2(-6, -13.5), Vector2(7, -13.5)]:
-		_tree(Vector3(p.x, 0, p.y), 0.9 + _rng.randf() * 0.4)
-	for i in 40:
-		var a := _rng.randf() * TAU
-		var d := 34.0 + _rng.randf() * 30.0
-		var pos := Vector3(cos(a) * d, 0, sin(a) * d)
-		if absf(pos.z - 14.5) < 5.0:
+	# Rund ums Grundstück: Kirschbäume und Laubbäume im Wechsel
+	var near := [Vector2(-13, -12), Vector2(13, -11), Vector2(-14, 4), Vector2(14, 2), Vector2(-12.5, 10), Vector2(12.5, 9.5), Vector2(-6, -13.5), Vector2(7, -13.5)]
+	for i in near.size():
+		_tree("kirschbaum" if i % 2 == 0 else "laubbaum", Vector3(near[i].x, 0, near[i].y), 0.85 + _rng.randf() * 0.3)
+	# Büsche an Häusern und Wegrändern
+	for i in 18:
+		var bx := -40.0 + _rng.randf() * 80.0
+		var bz: float = [19.5, 9.5, -16.0][i % 3] + _rng.randf_range(-0.8, 0.8)
+		if absf(bx) < FENCE + 2.0 and bz < 12.0:
 			continue
-		_tree(pos, 1.0 + _rng.randf() * 0.6)
+		_tree("busch", Vector3(bx, 0, bz), 0.7 + _rng.randf() * 0.5)
+	# Waldrand in der Ferne
+	for i in 70:
+		var a := _rng.randf() * TAU
+		var d := 34.0 + _rng.randf() * 34.0
+		var pos := Vector3(cos(a) * d, 0, sin(a) * d)
+		if absf(pos.z - 14.5) < 5.0 or (absf(pos.x - 6.0) < 14.0 and pos.z < -60.0):
+			continue
+		_tree(_pick_forest(), pos, 0.85 + _rng.randf() * 0.45)
 
 	# Steinerne Schachdame als Denkmal an der Straße
 	var queen: Node3D = QUEEN_SCENE.instantiate()
@@ -321,6 +353,49 @@ func _build_neighbourhood() -> void:
 		_flags.append(flag)
 
 
+## Alle GLB-Dateien im Ordner der Haus-Modelle (sortiert), auch in exportierten Spielen.
+func _house_models() -> Array[PackedScene]:
+	var list: Array[PackedScene] = []
+	var dir := "res://assets/models/houses/"
+	var names := []
+	for f in DirAccess.get_files_at(dir):
+		var n := f.trim_suffix(".import").trim_suffix(".remap")
+		if n.get_extension() == "glb" and not names.has(n):
+			names.append(n)
+	names.sort()
+	for n in names:
+		var scene := load(dir + n) as PackedScene
+		if scene:
+			list.append(scene)
+	return list
+
+
+## Stellt ein importiertes Modell als Haus auf: passt es in die Grundfläche (Breite × Tiefe),
+## stellt es auf den Boden, gibt ihm Toon-Look und eine Kollision. turn: Drehung zur Straße.
+func _model_house(scene: PackedScene, pos: Vector3, footprint: Vector2, turn: float) -> void:
+	var holder := Node3D.new()
+	holder.position = pos
+	holder.rotation.y = turn
+	add_child(holder)
+	var model: Node3D = scene.instantiate()
+	holder.add_child(model)
+	var box := AABB()
+	var first := true
+	for mi in model.find_children("*", "MeshInstance3D", true, false):
+		var b: AABB = (holder.global_transform.affine_inverse() * mi.global_transform) * mi.get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	if first:
+		return
+	var k := minf(footprint.x / maxf(box.size.x, 0.01), footprint.y / maxf(box.size.z, 0.01))
+	model.scale *= k
+	model.position = Vector3(-box.get_center().x, -box.position.y, -box.get_center().z) * k
+	Toon.apply_to(model, 0.015 / k)
+	var size := box.size * k
+	var world_size := Vector3(size.z, size.y, size.x) if absf(sin(turn)) > 0.7 else size
+	_collider(pos + Vector3(0, size.y * 0.5, 0), Vector3(world_size.x * 0.9, size.y, world_size.z * 0.9))
+
+
 func _house(pos: Vector3, size: Vector3, roof_color: Color, faces_south: bool) -> void:
 	var h := Node3D.new()
 	h.position = pos
@@ -349,26 +424,29 @@ func _house(pos: Vector3, size: Vector3, roof_color: Color, faces_south: bool) -
 	_collider(pos + Vector3(0, height * 0.5, 0), Vector3(w + 0.2, height, d + 0.2))
 
 
-func _tree(pos: Vector3, s: float) -> void:
-	var t := Node3D.new()
+func _tree(kind: String, pos: Vector3, s: float) -> void:
+	var spec: Array = TREES[kind]
+	var t: Node3D = (spec[0] as PackedScene).instantiate()
 	t.position = pos
-	t.rotation.y = pos.x * 1.7
+	t.rotation.y = _rng.randf() * TAU
+	t.scale = Vector3.ONE * s
 	add_child(t)
-	var trunk := MeshInstance3D.new()
-	var cyl := CylinderMesh.new()
-	cyl.top_radius = 0.18 * s
-	cyl.bottom_radius = 0.26 * s
-	cyl.height = 1.6 * s
-	cyl.radial_segments = 8
-	trunk.mesh = cyl
-	trunk.position.y = 0.8 * s
-	trunk.material_override = Toon.mat(Color("8a5a3c"), null, Vector2.ONE, 0.015)
-	t.add_child(trunk)
-	var color: Color = CROWN_COLORS[_rng.randi() % CROWN_COLORS.size()]
-	for b in [Vector4(0, 2.2, 0, 1.15), Vector4(0.7, 1.85, 0.2, 0.8), Vector4(-0.65, 1.9, -0.15, 0.85), Vector4(0.1, 2.75, -0.1, 0.8)]:
-		var blob := _blob(Vector3(b.x, b.y, b.z) * s, b.w * s, color, t)
-		blob.position = Vector3(b.x, b.y, b.z) * s
-	_collider(pos + Vector3(0, 1, 0), Vector3(0.6 * s, 2, 0.6 * s))
+	Toon.apply_to(t, 0.02 / s)
+	Toon.set_sway(t, 0.01 if kind != "busch" else 0.02, spec[1])
+	if spec[2] > 0.0:
+		_collider(pos + Vector3(0, 1, 0), Vector3(spec[2] * s, 2, spec[2] * s))
+
+
+func _pick_forest() -> String:
+	var total := 0
+	for e in FOREST_MIX:
+		total += e[1]
+	var r := _rng.randi() % total
+	for e in FOREST_MIX:
+		r -= e[1]
+		if r < 0:
+			return e[0]
+	return "laubbaum"
 
 
 # ---------------------------------------------------------------- Gras
@@ -506,20 +584,6 @@ func _box(size: Vector3, pos: Vector3, color: Color, outline := 0.02, shadow := 
 	mi.position = pos
 	mi.material_override = Toon.mat(color, null, Vector2.ONE, outline)
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadow else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	parent.add_child(mi)
-	return mi
-
-
-func _blob(pos: Vector3, radius: float, color: Color, parent: Node = self) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	var sm := SphereMesh.new()
-	sm.radius = radius
-	sm.height = radius * 2.0
-	sm.radial_segments = 12
-	sm.rings = 6
-	mi.mesh = sm
-	mi.position = pos
-	mi.material_override = Toon.mat(color, null, Vector2.ONE, 0.025)
 	parent.add_child(mi)
 	return mi
 

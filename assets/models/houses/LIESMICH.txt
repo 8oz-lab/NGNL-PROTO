@@ -1,0 +1,8 @@
+Haus-Modelle für Elkia (GLB).
+
+Jede .glb-Datei in diesem Ordner erscheint im Spiel automatisch als Haus auf der anderen
+Straßenseite gegenüber dem Grundstück (alphabetisch von der Mitte nach außen, bis zu 9 Häuser). Das Modell wird auf
+etwa 8 × 6,5 m Grundfläche skaliert, auf den Boden gestellt und bekommt den Toon-Look.
+
+Modelle erzeugen: python3 tools/tripo_houses.py  (Tripo-Schlüssel als Network secret oder TRIPO_API_KEY)
+oder auf tripo3d.ai erstellen, als GLB exportieren und hier hineinlegen.
