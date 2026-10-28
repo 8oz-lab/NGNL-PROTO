@@ -73,6 +73,7 @@ var _start_hero: Node3D
 var _ring_next := 0
 var _ring_timer := -1.0
 var _chest_open := false
+var _closing := false
 
 var _markers: Array[Node3D] = []
 var _pieces: Array[Node3D] = []
@@ -132,8 +133,7 @@ func _next() -> void:
 			_beam_at(WAYPOINT_A)
 		"springen":
 			_jumps0 = hero.jumps
-			for h in _hurdles:
-				h.visible = true
+			_show_hurdles(true)
 			_beam_at(HURDLE_GOAL)
 		"sammeln":
 			for p in _pieces:
@@ -158,6 +158,8 @@ func _next() -> void:
 
 
 func _process(delta: float) -> void:
+	if _closing:
+		return
 	_t += delta
 	_animate(delta)
 	_highlight_keys()
@@ -194,8 +196,7 @@ func _process(delta: float) -> void:
 			var jumps: int = hero.jumps - _jumps0
 			progress.text = "Sprünge: %d" % jumps
 			if p.x < HURDLE_GOAL.x + 1.5 and absf(p.z - HURDLE_GOAL.z) < 4.0 and jumps >= 2:
-				for h in _hurdles:
-					h.visible = false
+				_show_hurdles(false)
 				_complete()
 		"sammeln":
 			var left := 0
@@ -249,7 +250,11 @@ func skip() -> void:
 
 
 func _finish() -> void:
+	if _closing:
+		return
+	_closing = true
 	_voice.stop()
+	_clear_props()
 	var tw := create_tween()
 	tw.tween_property(card, "modulate:a", 0.0, 0.6)
 	tw.tween_callback(func():
@@ -389,8 +394,9 @@ func _build_props() -> void:
 		shape.position.y = 0.35
 		body.add_child(shape)
 		h.add_child(body)
-		h.visible = false
+		h.set_meta("shape", shape)
 		_hurdles.append(h)
+	_show_hurdles(false)
 	# Goldene Schachfiguren
 	var scenes := ["res://assets/models/props/chess_queen.glb", "res://assets/models/props/chess_knight.glb", "res://assets/models/props/chess_bishop.glb"]
 	for i in PIECES.size():
@@ -444,6 +450,29 @@ func _model(path: String, height: float, tint: Color) -> Node3D:
 	m.position = Vector3(-box.get_center().x, -box.position.y, -box.get_center().z) * k
 	Toon.apply_to(m, 0.012 / k, tint)
 	return holder
+
+
+## Hürden zeigen und fest machen bzw. ganz ausblenden (unsichtbare Hürden dürfen nicht im Weg stehen).
+func _show_hurdles(on: bool) -> void:
+	for h in _hurdles:
+		h.visible = on
+		(h.get_meta("shape") as CollisionShape3D).set_deferred("disabled", not on)
+
+
+## Entfernt alles, was das Training in die Welt gestellt hat.
+func _clear_props() -> void:
+	var props: Array[Node3D] = [_beam, _chest]
+	props.append_array(_markers)
+	props.append_array(_hurdles)
+	props.append_array(_pieces)
+	props.append_array(_rings)
+	for n in props:
+		if is_instance_valid(n):
+			n.queue_free()
+	_markers.clear()
+	_hurdles.clear()
+	_pieces.clear()
+	_rings.clear()
 
 
 func _beam_at(pos: Vector3) -> void:

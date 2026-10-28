@@ -6,6 +6,7 @@ var _last_key := ""
 var _wait := 0.0
 var _coins0 := -1
 var _ring := 0
+var _hurdle_check := true
 
 
 func _process(delta: float) -> void:
@@ -17,9 +18,25 @@ func _process(delta: float) -> void:
 	var tut: Tutorial = world.tutorial
 	if tut == null:
 		if _last_key != "":
-			print("ENDE: Training beendet, Münzen %d → %d, gespeichert: %s" % [_coins0, GameState.coins, GameState.tutorial_done])
+			# eine Sekunde warten, bis die Objekte des Trainings entfernt sind
+			_wait += delta
+			if _wait < 1.0:
+				return
+			var blockers := 0
+			for body in world.find_children("*", "StaticBody3D", true, false):
+				var p: Vector3 = body.global_position
+				if absf(p.z - Tutorial.ROAD_Z) < 0.1 and p.x < -4.0 and p.x > -16.0:
+					blockers += 1
+			print("ENDE: Training beendet, Münzen %d → %d, gespeichert: %s, Hürden übrig: %d" % [_coins0, GameState.coins, GameState.tutorial_done, blockers])
 			get_tree().quit()
 		return
+	if tut._key == "laufen" and _wait > 0.3 and _hurdle_check:
+		_hurdle_check = false
+		var solid := 0
+		for h in tut._hurdles:
+			if not (h.get_meta("shape") as CollisionShape3D).disabled:
+				solid += 1
+		print("vor dem Sprung-Schritt feste Hürden: %d (erwartet 0)" % solid)
 	if tut._key != _last_key:
 		print("%6.1f s  Schritt: %s" % [Time.get_ticks_msec() / 1000.0, tut._key])
 		_last_key = tut._key
