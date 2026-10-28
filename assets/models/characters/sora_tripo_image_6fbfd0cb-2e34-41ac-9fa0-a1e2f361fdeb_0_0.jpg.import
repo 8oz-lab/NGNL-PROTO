@@ -1,0 +1,37 @@
+[remap]
+
+importer="texture"
+type="CompressedTexture2D"
+uid="uid://d0mxp00x2ubv6"
+path="res://.godot/imported/sora_tripo_image_6fbfd0cb-2e34-41ac-9fa0-a1e2f361fdeb_0_0.jpg-eb9091e1638252785e274b6a454be285.ctex"
+metadata={
+"vram_texture": false
+}
+generator_parameters={
+"md5": "2b3c5352a27b266ee61a088165b1671c"
+}
+
+[deps]
+
+source_file="res://assets/models/characters/sora_tripo_image_6fbfd0cb-2e34-41ac-9fa0-a1e2f361fdeb_0_0.jpg"
+dest_files=["res://.godot/imported/sora_tripo_image_6fbfd0cb-2e34-41ac-9fa0-a1e2f361fdeb_0_0.jpg-eb9091e1638252785e274b6a454be285.ctex"]
+
+[params]
+
+compress/mode=0
+compress/high_quality=false
+compress/lossy_quality=0.7
+compress/hdr_compression=1
+compress/normal_map=0
+compress/channel_pack=0
+mipmaps/generate=true
+mipmaps/limit=-1
+roughness/mode=0
+roughness/src_normal=""
+process/fix_alpha_border=true
+process/premult_alpha=false
+process/normal_map_invert_y=false
+process/hdr_as_srgb=false
+process/hdr_clamp_exposure=false
+process/size_limit=0
+detect_3d/compress_to=1
