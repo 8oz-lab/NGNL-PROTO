@@ -2,6 +2,7 @@
 #   houses:  assets/models/houses/     – das Spiel stellt jede GLB von dort automatisch an die Straße
 #   bauten:  assets/models/buildings/  – Burg, Stadtmauer, Mauerturm, Stadttor
 #   tutorial: assets/models/tutorial/  – Schatztruhe und Wegstein für das Steuerungs-Tutorial
+#   figuren: assets/models/characters/ – Teto (schwebt beim Sturz neben euch)
 #
 # Voraussetzungen: Netzwerkzugriff auf api.tripo3d.ai (und den Download-Host der fertigen Modelle)
 # und der Tripo-Schlüssel: entweder als „Network secret“ der Umgebung (wird automatisch als
@@ -15,7 +16,7 @@ import urllib.request
 from pathlib import Path
 
 API = "https://api.tripo3d.ai/v2/openapi"
-STYLE = ("stylized anime fantasy game asset, medieval european town, clean shapes, soft pastel colors, "
+STYLE = ("stylized anime fantasy game asset, clean shapes, soft pastel colors, "
          "hand-painted look, single object, no people, no background")
 HOUSES = {
     "stadthaus_blau": "two-story town house, white plaster walls with dark timber frame, steep blue slate roof, wooden door, flower boxes under the windows",
@@ -39,10 +40,16 @@ TUTORIAL = {
     "wegstein": ("small round carved stone pedestal with glowing blue rune lines, a floating blue crystal above it, "
                  "magical waypoint marker", 8000),
 }
+FIGUREN = {
+    "teto": ("cute chibi anime boy god floating in the air, cheerful smile, short brown hair, big playful hat with a gold star badge, "
+             "loose white and gold tunic with blue accents, short cape, one hand raised waving, the other hand on the hip, "
+             "legs slightly bent as if hovering, full body, game character, clean shapes", 20000),
+}
 SETS = {
     "houses": ("assets/models/houses", {k: (v, 12000) for k, v in HOUSES.items()}),
     "bauten": ("assets/models/buildings", BAUTEN),
     "tutorial": ("assets/models/tutorial", TUTORIAL),
+    "figuren": ("assets/models/characters", FIGUREN),
 }
 
 

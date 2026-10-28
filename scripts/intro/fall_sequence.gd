@@ -104,6 +104,16 @@ var numeral: Label
 var hint: Label
 var orb: Control
 
+## Teto schwebt rechts vor der Kamera mit (Modell aus tools/tripo_models.py figuren)
+const TETO_MODEL := "res://assets/models/characters/teto.glb"
+const TETO_OFFSET := Vector3(2.2, -0.25, -5.3)
+var teto: Node3D
+var _teto_model: Node3D
+var _teto_spark: CPUParticles3D
+var _teto_light: OmniLight3D
+var _teto_pos := Vector3.ZERO
+var _teto_away := 0.0
+
 
 func _ready() -> void:
 	noise = NoiseTexture2D.new()
@@ -126,6 +136,7 @@ func _ready() -> void:
 	add_child(cam)
 	cam.current = true
 	_build_speed_lines()
+	_build_teto()
 	_build_ui()
 	_voice = AudioStreamPlayer.new()
 	_voice.volume_db = 1.0
@@ -427,6 +438,8 @@ func _next_line() -> void:
 	if line >= LINES.size():
 		_start_dive()
 		return
+	if line == 0:
+		_teto_appear()
 	var l: Array = LINES[line]
 	text_label.text = l[1]
 	text_label.visible_characters = 0
@@ -466,6 +479,7 @@ func _speak() -> void:
 
 func _start_dive() -> void:
 	_dive = 0.0
+	_teto_leave()
 	create_tween().tween_property(panel, "modulate:a", 0.0, 0.6)
 	create_tween().tween_property(numeral, "modulate:a", 0.0, 0.4)
 	create_tween().tween_property(hint, "modulate:a", 0.0, 0.6)
@@ -525,8 +539,118 @@ func _process(delta: float) -> void:
 		if _dive > DIVE_TIME:
 			_finish()
 	_place_camera(delta)
+	_update_teto(delta)
 	_update_clouds()
 	_update_buddies(delta)
+
+
+# ------------------------------------------------------------------ Teto als Figur
+
+func _build_teto() -> void:
+	teto = Node3D.new()
+	add_child(teto)
+	if ResourceLoader.exists(TETO_MODEL):
+		var m: Node3D = load(TETO_MODEL).instantiate()
+		var pivot := Node3D.new()
+		pivot.rotation.y = PI * 0.5   # das Modell schaut in +X; so zeigt die Vorderseite zur Kamera
+		teto.add_child(pivot)
+		pivot.add_child(m)
+		var box := _aabb(m)
+		var k := 1.6 / maxf(box.size.y, 0.01)
+		m.scale = Vector3.ONE * k
+		m.position = -box.get_center() * k
+		Toon.apply_to(m, 0.008 / k)
+		_teto_model = pivot
+	else:
+		# Ersatz ohne Modell: leuchtender Stern
+		var star := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.35
+		sm.height = 0.7
+		star.mesh = sm
+		star.material_override = Toon.glow(Color(1.0, 0.85, 0.45), 2.0)
+		teto.add_child(star)
+		_teto_model = star
+	_teto_light = OmniLight3D.new()
+	_teto_light.light_color = Color(1.0, 0.86, 0.6)
+	_teto_light.light_energy = 1.2
+	_teto_light.omni_range = 4.0
+	teto.add_child(_teto_light)
+	# Funkelspur
+	_teto_spark = CPUParticles3D.new()
+	_teto_spark.amount = 40
+	_teto_spark.lifetime = 1.4
+	_teto_spark.local_coords = false
+	_teto_spark.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	_teto_spark.emission_sphere_radius = 0.6
+	_teto_spark.direction = Vector3.UP
+	_teto_spark.spread = 180.0
+	_teto_spark.initial_velocity_min = 0.2
+	_teto_spark.initial_velocity_max = 0.8
+	_teto_spark.gravity = Vector3(0, 2.0, 0)   # Sturz: Funken „steigen“ relativ zu uns
+	_teto_spark.scale_amount_min = 0.5
+	_teto_spark.scale_amount_max = 1.2
+	var q := QuadMesh.new()
+	q.size = Vector2(0.07, 0.07)
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.vertex_color_use_as_albedo = true
+	q.material = mat
+	_teto_spark.mesh = q
+	var grad := Gradient.new()
+	grad.set_color(0, Color(1.0, 0.95, 0.7, 1.0))
+	grad.set_color(1, Color(0.6, 0.8, 1.0, 0.0))
+	_teto_spark.color_ramp = grad
+	_teto_spark.emitting = false
+	teto.add_child(_teto_spark)
+	teto.scale = Vector3.ONE * 0.01   # erst nach dem Ausmessen klein machen; taucht beim ersten Satz auf
+	teto.visible = false
+
+
+func _teto_appear() -> void:
+	_teto_pos = cam.global_transform * TETO_OFFSET
+	teto.global_position = _teto_pos
+	teto.visible = true
+	_teto_spark.emitting = true
+	Flow.play("welcome", -10, 1.4)
+	var burst := _teto_spark.duplicate() as CPUParticles3D
+	burst.one_shot = true
+	burst.explosiveness = 1.0
+	burst.amount = 60
+	burst.initial_velocity_min = 2.0
+	burst.initial_velocity_max = 4.0
+	burst.emitting = true
+	teto.add_child(burst)
+	var tw := create_tween()
+	tw.tween_property(teto, "scale", Vector3.ONE * 1.15, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(teto, "scale", Vector3.ONE, 0.2)
+
+
+func _teto_leave() -> void:
+	var tw := create_tween()
+	tw.tween_property(self, "_teto_away", 1.0, 1.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func(): _teto_spark.emitting = false)
+	tw.parallel().tween_property(teto, "scale", Vector3.ONE * 0.01, 0.5).set_delay(1.1)
+	tw.tween_callback(func(): teto.visible = false)
+
+
+func _update_teto(delta: float) -> void:
+	if not teto.visible:
+		return
+	# schwebt weich hinter seinem Platz vor der Kamera her, beim Abschied nach oben davon
+	var offset := TETO_OFFSET + Vector3(0, sin(_t * 1.8) * 0.18 + _teto_away * 9.0, _teto_away * -6.0)
+	var goal := cam.global_transform * offset
+	_teto_pos = _teto_pos.lerp(goal, clampf(delta * 5.0, 0.0, 1.0)) if _teto_pos != Vector3.ZERO else goal
+	teto.global_position = _teto_pos
+	teto.look_at(cam.global_position, Vector3.UP)
+	var talking: bool = _voice.playing or (line >= 0 and line < LINES.size() and typed < LINES[line][1].length())
+	var bounce := sin(_t * 13.0) * 0.035 if talking else 0.0
+	_teto_model.rotation.z = sin(_t * 1.3) * 0.08
+	_teto_model.rotation.x = sin(_t * 0.9) * 0.05
+	_teto_model.scale = Vector3(1.0 - bounce * 0.5, 1.0 + bounce, 1.0 - bounce * 0.5)
+	_teto_light.light_energy = 1.0 + (0.6 if talking else 0.0) + sin(_t * 3.0) * 0.15
 
 
 ## Höhe hängt vom Fortschritt des Gesprächs ab, am Ende folgt der Sturzflug auf die Insel.
