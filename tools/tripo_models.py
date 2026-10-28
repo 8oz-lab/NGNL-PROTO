@@ -1,6 +1,7 @@
 # Erzeugt Modelle für Elkia mit der Tripo-API (Text zu 3D-Modell) und speichert sie als GLB.
 #   houses:  assets/models/houses/     – das Spiel stellt jede GLB von dort automatisch an die Straße
 #   bauten:  assets/models/buildings/  – Burg, Stadtmauer, Mauerturm, Stadttor
+#   tutorial: assets/models/tutorial/  – Schatztruhe und Wegstein für das Steuerungs-Tutorial
 #
 # Voraussetzungen: Netzwerkzugriff auf api.tripo3d.ai (und den Download-Host der fertigen Modelle)
 # und der Tripo-Schlüssel: entweder als „Network secret“ der Umgebung (wird automatisch als
@@ -32,9 +33,16 @@ BAUTEN = {
     "stadttor": ("medieval city gatehouse with one large open arched gateway in the middle, two round towers with blue conical roofs, "
                  "light grey stone, open wooden gate doors, red banners", 15000),
 }
+TUTORIAL = {
+    "schatztruhe": ("ornate closed wooden treasure chest with gold trim and corner fittings, a few colorful gems on the lid, "
+                    "sitting on the ground", 8000),
+    "wegstein": ("small round carved stone pedestal with glowing blue rune lines, a floating blue crystal above it, "
+                 "magical waypoint marker", 8000),
+}
 SETS = {
     "houses": ("assets/models/houses", {k: (v, 12000) for k, v in HOUSES.items()}),
     "bauten": ("assets/models/buildings", BAUTEN),
+    "tutorial": ("assets/models/tutorial", TUTORIAL),
 }
 
 

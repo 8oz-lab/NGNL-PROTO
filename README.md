@@ -17,7 +17,7 @@ Das Spiel beginnt wie im Anime auf einem alten Windows-Desktop:
 2. Der Schriftzug **ようこそ♪** läuft über den Bildschirm, danach öffnet sich **Schach 98**. Figuren anklicken oder ziehen.
 3. Nach dem Sieg bricht das Brett, dann der Bildschirm. Aus der Ich-Perspektive seht ihr den Röhrenmonitor im Zimmer: Er flackert, sprüht Funken, das Glas zerspringt und ein Strudel zieht euch hinein.
 4. Sturz durch den Himmel von Disboard, Teto erklärt die Zehn Gebote auf Japanisch mit deutschen Untertiteln (Klick/Leertaste: weiter, **V**: Stimme Teto / Brabbeln / aus).
-5. Landung auf dem Grundstück.
+5. Landung auf dem Grundstück. Beim ersten Mal folgt **Tetos Steuerungs-Training**: umsehen, zoomen, laufen, über Hürden springen, goldene Figuren sammeln, durch Ringe sprinten (auf Zeit), Figur wechseln, Schatztruhe öffnen (+50 Münzen).
 
 Auf dem Desktop gibt es außerdem:
 
@@ -33,11 +33,13 @@ Auf dem Desktop gibt es außerdem:
 | Taste | Aktion |
 | --- | --- |
 | W A S D / Pfeiltasten | laufen (relativ zur Kamera) |
+| Leertaste | springen |
 | Shift | sprinten |
 | Maus ziehen | Kamera drehen |
 | Mausrad | zoomen |
 | Q | zwischen Sora und Shiro wechseln |
 | E | interagieren (Hütte, Schild, Parzelle), Dialog weiter |
+| F1 | Steuerungs-Training starten oder überspringen |
 
 ## Aufbau
 
@@ -50,6 +52,7 @@ Auf dem Desktop gibt es außerdem:
 | `scripts/flow.gd` | Autoload `Flow`: Szenenwechsel mit Blende, Klänge, Schriften |
 | `scenes/main.tscn` | Grundstück, baut über `world.gd` die Welt auf |
 | `scripts/world.gd` | Gelände, Parzellen, Hütte, Nachbarschaft, Steuerung, Interaktionen |
+| `scripts/tutorial.gd` | Steuerungs-Training mit Teto (Aufgaben, Tasten-Anzeige, Wegsteine, Hürden, Ringe, Truhe); Test: `tests/tutorial_bot.gd` |
 | `scripts/hero.gd` | Sora/Shiro: Modell, Animationen (Stehen, Gehen, Rennen), Bewegung |
 | `scripts/camera_rig.gd` | Kamera hinter der Figur mit Kollision (SpringArm) |
 | `scripts/hud.gd` | Anzeige: Münzen, Parzellen, aktive Figur, Parzellen-Info, Dialoge |

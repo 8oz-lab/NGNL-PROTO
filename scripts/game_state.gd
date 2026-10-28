@@ -10,6 +10,8 @@ const PARCEL_VALUE := 50
 var coins: int = START_COINS
 ## Parzellen-ID → Zustand. "owner" ist "player" oder der Name eines Gegners, "building" ist leer oder ein Gebäude.
 var parcels: Dictionary = {}
+## Steuerungs-Tutorial schon einmal abgeschlossen oder übersprungen
+var tutorial_done := false
 
 
 func _ready() -> void:
@@ -41,7 +43,7 @@ func parcel_value(id: String) -> int:
 func save_game() -> void:
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
-		f.store_string(JSON.stringify({"coins": coins, "parcels": parcels}))
+		f.store_string(JSON.stringify({"coins": coins, "parcels": parcels, "tutorial_done": tutorial_done}))
 
 
 func load_game() -> void:
@@ -50,6 +52,7 @@ func load_game() -> void:
 	var data = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 	if data is Dictionary:
 		coins = int(data.get("coins", START_COINS))
+		tutorial_done = bool(data.get("tutorial_done", false))
 		if data.get("parcels") is Dictionary:
 			for id in data["parcels"]:
 				if parcels.has(id):
@@ -66,7 +69,9 @@ func _setup_input() -> void:
 		"move_right": [KEY_D, KEY_RIGHT],
 		"sprint": [KEY_SHIFT],
 		"swap": [KEY_Q, KEY_TAB],
-		"interact": [KEY_E, KEY_ENTER, KEY_SPACE],
+		"interact": [KEY_E, KEY_ENTER],
+		"jump": [KEY_SPACE],
+		"tutorial": [KEY_F1],
 	}
 	for action in keys:
 		if not InputMap.has_action(action):

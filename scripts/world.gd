@@ -50,6 +50,7 @@ var grass_tex: Texture2D
 var cobble_tex: Texture2D
 var noise_tex: NoiseTexture2D
 var grass: GrassField
+var tutorial: Tutorial
 var _footprints: Array[Rect2] = []
 
 
@@ -63,6 +64,9 @@ func _ready() -> void:
 	_build_neighbourhood()
 	_build_grass()
 	_spawn_heroes()
+	# Steuerungs-Training beim ersten Mal (oder mit `-- --tutorial`)
+	if not GameState.tutorial_done or OS.get_cmdline_user_args().has("--tutorial"):
+		get_tree().create_timer(4.5).timeout.connect(_start_tutorial)
 	# Entwicklerhilfe: `-- --capture=bild.png` speichert nach kurzer Zeit ein Bild und beendet das Spiel
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--capture="):
@@ -673,7 +677,8 @@ func _spawn_heroes() -> void:
 		hero.skill = spec[1]
 		hero.model_scene = spec[2]
 		hero.height = spec[3]
-		hero.anim_sources = [spec[5]]
+		# fehlende Animationen (z. B. Springen) aus den anderen Modellen übernehmen
+		hero.anim_sources = [spec[5], SHIRO_SCENE]
 		hero.position = spec[4]
 		add_child(hero)
 		hero.model.rotation.y = PI
@@ -691,8 +696,28 @@ func _spawn_heroes() -> void:
 	hud.set_hero(heroes[0])
 
 
+func _start_tutorial() -> void:
+	if tutorial:
+		return
+	tutorial = Tutorial.new()
+	tutorial.world = self
+	tutorial.finished.connect(func(): tutorial = null)
+	add_child(tutorial)
+
+
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("swap"):
+	if event.is_action_pressed("tutorial"):
+		if tutorial:
+			tutorial.skip()
+		else:
+			_start_tutorial()
+	elif event.is_action_pressed("jump") and not hud.is_talking():
+		if heroes[active].jump():
+			Flow.play("whoosh", -16, 1.6)
+			# die zweite Figur springt kurz danach mit
+			var other := heroes[1 - active]
+			get_tree().create_timer(0.14).timeout.connect(func(): other.jump())
+	elif event.is_action_pressed("swap"):
 		active = 1 - active
 		rig.target = heroes[active]
 		hud.set_hero(heroes[active])
@@ -754,11 +779,15 @@ func _update_parcel(p: Vector3) -> void:
 		var c := highlight.position
 		if Vector2(p.x, p.z).distance_to(Vector2(c.x, c.z)) < 1.2:
 			_spot = {"label": "E · Parzelle ansehen", "kind": "parcel"}
+	if tutorial and tutorial.spot_label(p) != "":
+		_spot = {"label": tutorial.spot_label(p), "kind": "tutorial"}
 	hud.show_prompt(_spot.get("label", ""))
 
 
 func _interact() -> void:
 	match _spot["kind"]:
+		"tutorial":
+			tutorial.interact()
 		"hut":
 			GameState.save_game()
 			hud.say([["Sora", "Unser Zuhause. Klein, aber es gehört uns."], ["Shiro", "…Gespeichert."], ["Sora", "Die Hütte steht auf B1. Die Parzelle setzen wir nie, egal wie verlockend die Wette ist."]])
