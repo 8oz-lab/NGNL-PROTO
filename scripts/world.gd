@@ -272,7 +272,12 @@ func _build_hut() -> void:
 # ---------------------------------------------------------------- Nachbarschaft
 
 func _build_neighbourhood() -> void:
+	# Häuser aus assets/models/houses/ (z. B. von Tripo) ersetzen die ersten Häuser auf der anderen Straßenseite
+	var models := _house_models()
 	for i in 9:
+		if i < models.size():
+			_model_house(models[i], Vector3(-40 + i * 10, 0, 24.5), Vector2(8.0, 6.5), PI)
+			continue
 		_house(Vector3(-40 + i * 10 + (_rng.randf() - 0.5) * 2, 0, 24), Vector3(6 + _rng.randf() * 2, 3.4 + _rng.randf() * 1.6, 5), ROOF_COLORS[i % 6], false)
 	for x in [-20.0, -32.0, 20.0, 32.0]:
 		_house(Vector3(x, 0, 6 + _rng.randf() * 4), Vector3(6, 3.6 + _rng.randf(), 5), ROOF_COLORS[int(x + 40) % 6], true)
@@ -339,6 +344,49 @@ func _build_neighbourhood() -> void:
 		_box(Vector3(0.12, 3.0, 0.12), Vector3(0, 1.0, 0), Color("7a5a3a"), 0.0, false, flag)
 		_box(Vector3(2.0, 1.1, 0.05), Vector3(1.0, 1.9, 0), Color("e0405f"), 0.0, false, flag)
 		_flags.append(flag)
+
+
+## Alle GLB-Dateien im Ordner der Haus-Modelle (sortiert), auch in exportierten Spielen.
+func _house_models() -> Array[PackedScene]:
+	var list: Array[PackedScene] = []
+	var dir := "res://assets/models/houses/"
+	var names := []
+	for f in DirAccess.get_files_at(dir):
+		var n := f.trim_suffix(".import").trim_suffix(".remap")
+		if n.get_extension() == "glb" and not names.has(n):
+			names.append(n)
+	names.sort()
+	for n in names:
+		var scene := load(dir + n) as PackedScene
+		if scene:
+			list.append(scene)
+	return list
+
+
+## Stellt ein importiertes Modell als Haus auf: passt es in die Grundfläche (Breite × Tiefe),
+## stellt es auf den Boden, gibt ihm Toon-Look und eine Kollision. turn: Drehung zur Straße.
+func _model_house(scene: PackedScene, pos: Vector3, footprint: Vector2, turn: float) -> void:
+	var holder := Node3D.new()
+	holder.position = pos
+	holder.rotation.y = turn
+	add_child(holder)
+	var model: Node3D = scene.instantiate()
+	holder.add_child(model)
+	var box := AABB()
+	var first := true
+	for mi in model.find_children("*", "MeshInstance3D", true, false):
+		var b: AABB = (holder.global_transform.affine_inverse() * mi.global_transform) * mi.get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	if first:
+		return
+	var k := minf(footprint.x / maxf(box.size.x, 0.01), footprint.y / maxf(box.size.z, 0.01))
+	model.scale *= k
+	model.position = Vector3(-box.get_center().x, -box.position.y, -box.get_center().z) * k
+	Toon.apply_to(model, 0.015 / k)
+	var size := box.size * k
+	var world_size := Vector3(size.z, size.y, size.x) if absf(sin(turn)) > 0.7 else size
+	_collider(pos + Vector3(0, size.y * 0.5, 0), Vector3(world_size.x * 0.9, size.y, world_size.z * 0.9))
 
 
 func _house(pos: Vector3, size: Vector3, roof_color: Color, faces_south: bool) -> void:
