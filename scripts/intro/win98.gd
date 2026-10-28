@@ -46,3 +46,46 @@ static func button(text: String, min_width := 80) -> W98Button:
 	b.text = text
 	b.custom_minimum_size = Vector2(min_width, 26)
 	return b
+
+
+## Kontextmenü im Win98-Stil.
+static func popup() -> PopupMenu:
+	var p := PopupMenu.new()
+	var panel := StyleBoxFlat.new()
+	panel.bg_color = FACE
+	panel.border_color = DARK
+	panel.set_border_width_all(1)
+	panel.border_width_left = 2
+	panel.border_width_top = 2
+	panel.border_color = SHADE
+	panel.set_content_margin_all(3)
+	var hover := StyleBoxFlat.new()
+	hover.bg_color = NAVY
+	p.add_theme_stylebox_override("panel", panel)
+	p.add_theme_stylebox_override("hover", hover)
+	var sep := StyleBoxLine.new()
+	sep.color = SHADE
+	sep.thickness = 1
+	p.add_theme_stylebox_override("separator", sep)
+	p.add_theme_font_override("font", Flow.font_ui)
+	p.add_theme_font_size_override("font_size", 13)
+	p.add_theme_color_override("font_color", Color.BLACK)
+	p.add_theme_color_override("font_hover_color", Color.WHITE)
+	p.add_theme_color_override("font_disabled_color", SHADE)
+	p.add_theme_constant_override("v_separation", 8)
+	p.add_theme_constant_override("item_start_padding", 14)
+	p.add_theme_constant_override("item_end_padding", 24)
+	return p
+
+
+## Weißes, eingelassenes Feld (z. B. für Listen und Texte).
+static func sunken_box(fill := Color.WHITE) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = fill
+	s.border_color = SHADE
+	s.border_width_left = 2
+	s.border_width_top = 2
+	s.border_width_right = 1
+	s.border_width_bottom = 1
+	s.set_content_margin_all(6)
+	return s

@@ -19,7 +19,14 @@ Das Spiel beginnt wie im Anime auf einem alten Windows-Desktop:
 4. Sturz durch den Himmel von Disboard, Teto erklärt die Zehn Gebote (Klick/Leertaste: weiter, **V**: Stimme Brabbeln / Japanisch / aus).
 5. Landung auf dem Grundstück.
 
-**F8** bzw. **Esc** (in den 3D-Szenen) überspringt das Intro.
+Auf dem Desktop gibt es außerdem:
+
+- **Liga der Legenden** (Rang 1, Challenger) und **Counter-Spike GO** (Global Elite), jeweils mit Chats von erfundenen Profis
+- **Internet** (NetSurfer 98) mit dem Forum *Threadit*: Communities, Beiträge, Kommentare, Abstimmen
+- **Startmenü**, Fenster lassen sich verschieben, an Rand und Ecke in der Größe ziehen und minimieren
+- Symbole verschieben (auch mehrere per Rahmen), Rechtsklick → **Neuer Ordner / Neues Textdokument**, Umbenennen (F2), Löschen (Entf oder auf den Papierkorb ziehen), in Ordner ziehen. Ordner und Texte werden gespeichert (`user://desktop.json`).
+
+**F8** bzw. **Esc** (in den 3D-Szenen) überspringt das Intro. Zum Testen: im Browser `skip:secret` als Adresse eingeben.
 
 ## Steuerung
 
@@ -38,6 +45,8 @@ Das Spiel beginnt wie im Anime auf einem alten Windows-Desktop:
 | --- | --- |
 | `scenes/intro/` | Intro: `desktop.tscn` (Startszene), `break_sequence.tscn`, `fall_sequence.tscn` |
 | `scripts/intro/` | Desktop, Win98-Bausteine, Schach-Engine und Brett, Monitor-Zerstörung, Sturz mit Teto |
+| `scripts/intro/launchers.gd`, `net_surfer.gd`, `threadit.gd` | Spiele-Clients mit Chats, Browser und Forum |
+| `scripts/intro/icon_view.gd`, `desk_fs.gd` | Desktop-Symbole, Ordner und Textdateien |
 | `scripts/flow.gd` | Autoload `Flow`: Szenenwechsel mit Blende, Klänge, Schriften |
 | `scenes/main.tscn` | Grundstück, baut über `world.gd` die Welt auf |
 | `scripts/world.gd` | Gelände, Parzellen, Hütte, Nachbarschaft, Steuerung, Interaktionen |
@@ -72,3 +81,11 @@ godot --headless --script res://tests/test_chess.gd
 ```
 
 prüft die Schach-Engine (Perft-Zählungen) und misst die Bedenkzeit des Bots.
+
+```
+godot --path . res://tests/desktop_test.tscn
+```
+
+klickt sich durch den Desktop (Datei anlegen, umbenennen, in Ordner und Papierkorb ziehen, Rahmenauswahl, Fenster ziehen und minimieren). Achtung: verändert die eigene `desktop.json`.
+
+Am Desktop öffnet `-- --open=lol,cs,web` Programme direkt, `--url=/t/blank` springt im Browser auf eine Seite, `--demo=start` zeigt das Startmenü.
