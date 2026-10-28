@@ -9,6 +9,18 @@ Ein Spiel-Prototyp in **Godot 4.3**, inspiriert von *No Game No Life*: Sora und 
 3. Beim ersten Öffnen importiert Godot die Modelle (dauert einen Moment).
 4. **F5** oder der Play-Knopf oben rechts startet das Spiel.
 
+## Der Anfang
+
+Das Spiel beginnt wie im Anime auf einem alten Windows-Desktop:
+
+1. Im Posteingang landet eine Mail von **???**: „Challenge für 「　」“. Antwort: **Ja** (oder zweimal Nein).
+2. Der Schriftzug **ようこそ♪** läuft über den Bildschirm, danach öffnet sich **Schach 98**. Figuren anklicken oder ziehen.
+3. Nach dem Sieg bricht das Brett, dann der Bildschirm. Aus der Ich-Perspektive seht ihr den Röhrenmonitor im Zimmer: Er flackert, sprüht Funken, das Glas zerspringt und ein Strudel zieht euch hinein.
+4. Sturz durch den Himmel von Disboard, Teto erklärt die Zehn Gebote (Klick/Leertaste: weiter, **V**: Stimme Brabbeln / Japanisch / aus).
+5. Landung auf dem Grundstück.
+
+**F8** bzw. **Esc** (in den 3D-Szenen) überspringt das Intro.
+
 ## Steuerung
 
 | Taste | Aktion |
@@ -24,7 +36,10 @@ Ein Spiel-Prototyp in **Godot 4.3**, inspiriert von *No Game No Life*: Sora und 
 
 | Pfad | Inhalt |
 | --- | --- |
-| `scenes/main.tscn` | Startszene, baut über `world.gd` das Grundstück auf |
+| `scenes/intro/` | Intro: `desktop.tscn` (Startszene), `break_sequence.tscn`, `fall_sequence.tscn` |
+| `scripts/intro/` | Desktop, Win98-Bausteine, Schach-Engine und Brett, Monitor-Zerstörung, Sturz mit Teto |
+| `scripts/flow.gd` | Autoload `Flow`: Szenenwechsel mit Blende, Klänge, Schriften |
+| `scenes/main.tscn` | Grundstück, baut über `world.gd` die Welt auf |
 | `scripts/world.gd` | Gelände, Parzellen, Hütte, Nachbarschaft, Steuerung, Interaktionen |
 | `scripts/hero.gd` | Sora/Shiro: Modell, Animationen (Stehen, Gehen, Rennen), Bewegung |
 | `scripts/camera_rig.gd` | Kamera hinter der Figur mit Kollision (SpringArm) |
@@ -39,7 +54,20 @@ Der Spielstand wird beim Betreten der Hütte gespeichert (`user://save.json`).
 ## Automatischer Test (für Entwicklung)
 
 ```
-godot --path . -- --capture=bild.png --walk
+godot --path . -- --start=world --capture=bild.png --walk
 ```
 
-startet das Spiel, läuft ein Stück nach vorne, speichert drei Bilder und beendet sich.
+startet direkt auf dem Grundstück, läuft ein Stück nach vorne, speichert drei Bilder und beendet sich.
+
+```
+godot --path . -- --start=fall --shots=bild.png --at=3,10
+godot --path . -- --demo=win --shots=bild.png --at=2,5,9
+```
+
+springt in einen Teil des Intros (`desktop`, `break`, `fall`, `world`) bzw. spielt am Desktop direkt den Mattzug (`--demo=mail|welcome|chess|win`) und speichert Bilder zu den angegebenen Sekunden.
+
+```
+godot --headless --script res://tests/test_chess.gd
+```
+
+prüft die Schach-Engine (Perft-Zählungen) und misst die Bedenkzeit des Bots.

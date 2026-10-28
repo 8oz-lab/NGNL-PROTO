@@ -7,12 +7,17 @@ config_version=5
 
 config/name="NGNL Proto"
 config/description="Disboard-Prototyp: Sora und Shiro auf ihrem Grundstück in Elkia."
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/intro/desktop.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
 
 [autoload]
 
 GameState="*res://scripts/game_state.gd"
+Flow="*res://scripts/flow.gd"
+
+[audio]
+
+general/text_to_speech=true
 
 [display]
 
