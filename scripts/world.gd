@@ -4,6 +4,7 @@ extends Node3D
 const SORA_SCENE := preload("res://assets/models/characters/sora.glb")
 const SHIRO_SCENE := preload("res://assets/models/characters/shiro.glb")
 const QUEEN_SCENE := preload("res://assets/models/props/chess_queen.glb")
+const GROUND_SHADER := preload("res://assets/shaders/ground.gdshader")
 
 const PARCEL := 6.0          # Kantenlänge einer Parzelle in Metern
 const HALF := 9.0            # halbe Breite des Grundstücks (3 × 6 m)
@@ -25,6 +26,9 @@ var _rng := RandomNumberGenerator.new()
 
 var grass_tex: Texture2D
 var cobble_tex: Texture2D
+var noise_tex: NoiseTexture2D
+var grass: GrassField
+var _footprints: Array[Rect2] = []
 
 
 func _ready() -> void:
@@ -35,6 +39,7 @@ func _ready() -> void:
 	_build_plot()
 	_build_hut()
 	_build_neighbourhood()
+	_build_grass()
 	_spawn_heroes()
 	# Entwicklerhilfe: `-- --capture=bild.png` speichert nach kurzer Zeit ein Bild und beendet das Spiel
 	for arg in OS.get_cmdline_user_args():
@@ -97,6 +102,16 @@ func _build_textures() -> void:
 	tex.noise = cell
 	tex.color_ramp = _ramp([Color("6e655a"), Color("a39785"), Color("c4baab")], [0.0, 0.18, 1.0])
 	cobble_tex = tex
+	# Großflächiges Rauschen für Farbvariation von Boden und Gras
+	var macro := FastNoiseLite.new()
+	macro.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	macro.frequency = 0.008
+	macro.fractal_octaves = 4
+	noise_tex = NoiseTexture2D.new()
+	noise_tex.width = 512
+	noise_tex.height = 512
+	noise_tex.seamless = true
+	noise_tex.noise = macro
 
 
 func _noise_texture(kind: int, freq: float, colors: Array) -> NoiseTexture2D:
@@ -124,7 +139,11 @@ func _build_ground() -> void:
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(240, 240)
 	ground.mesh = plane
-	ground.material_override = Toon.mat(Color.WHITE, grass_tex, Vector2(60, 60), 0.0)
+	var gm := ShaderMaterial.new()
+	gm.shader = GROUND_SHADER
+	gm.set_shader_parameter("noise_tex", noise_tex)
+	gm.set_shader_parameter("plot_half", HALF)
+	ground.material_override = gm
 	add_child(ground)
 	var body := StaticBody3D.new()
 	var shape := CollisionShape3D.new()
@@ -132,34 +151,12 @@ func _build_ground() -> void:
 	body.add_child(shape)
 	add_child(body)
 
-	var road := MeshInstance3D.new()
-	var rp := PlaneMesh.new()
-	rp.size = Vector2(160, 6)
-	road.mesh = rp
-	road.position = Vector3(0, 0.02, 14.5)
-	road.material_override = Toon.mat(Color.WHITE, cobble_tex, Vector2(48, 1.8), 0.0)
-	add_child(road)
-	var path := MeshInstance3D.new()
-	var pp := PlaneMesh.new()
-	pp.size = Vector2(2.4, 2.4)
-	path.mesh = pp
-	path.position = Vector3(0, 0.025, 10.7)
-	path.material_override = Toon.mat(Color.WHITE, cobble_tex, Vector2(1, 1), 0.0)
-	add_child(path)
+	# Straße, Zugangsweg und Erdwege malt der Boden-Shader (ground.gdshader)
 
 
 # ---------------------------------------------------------------- Grundstück
 
 func _build_plot() -> void:
-	var tints := [Color(1.08, 1.12, 0.98), Color(1.0, 1.06, 0.92), Color(1.14, 1.16, 1.02)]
-	for row in 3:
-		for col in 3:
-			var m := _box(Vector3(PARCEL - 0.4, 0.02, PARCEL - 0.4), Vector3(-HALF + PARCEL * (col + 0.5), 0.03, -HALF + PARCEL * (row + 0.5)), Color.WHITE, 0.0, false)
-			m.material_override = Toon.mat(tints[(row + col) % 3], grass_tex, Vector2(3, 3), 0.0)
-	var dirt := Color("a37a4c")
-	for k in [-3.0, 3.0]:
-		_box(Vector3(0.4, 0.03, 18), Vector3(k, 0.035, 0), dirt, 0.0, false)
-		_box(Vector3(18, 0.03, 0.4), Vector3(0, 0.035, k), dirt, 0.0, false)
 	for x in [-3.0, 3.0]:
 		for z in [-3.0, 3.0]:
 			_box(Vector3(0.12, 0.7, 0.12), Vector3(x, 0.35, z), Color("c99a5b"), 0.012)
@@ -371,6 +368,27 @@ func _tree(pos: Vector3, s: float) -> void:
 	_collider(pos + Vector3(0, 1, 0), Vector3(0.6 * s, 2, 0.6 * s))
 
 
+# ---------------------------------------------------------------- Gras
+
+func _build_grass() -> void:
+	grass = GrassField.new()
+	add_child(grass)
+	for r in _footprints:
+		grass.blocked.append(r.grow(0.15))
+	grass.blocked.append(Rect2(-0.9, -4.7, 1.8, 1.0))  # Stufe vor der Hütte
+	grass.exclude = func(p: Vector2) -> bool:
+		if absf(p.y - 14.5) < 3.25:
+			return true
+		if absf(p.x) < 1.4 and absf(p.y - 10.75) < 1.5:
+			return true
+		if absf(p.x) < HALF and absf(p.y) < HALF:
+			var dl := minf(minf(absf(p.x - 3.0), absf(p.x + 3.0)), minf(absf(p.y - 3.0), absf(p.y + 3.0)))
+			if dl < 0.38:
+				return true
+		return false
+	grass.build(noise_tex)
+
+
 # ---------------------------------------------------------------- Figuren
 
 func _spawn_heroes() -> void:
@@ -421,6 +439,7 @@ func _physics_process(delta: float) -> void:
 	var dir := rig.flat_basis() * Vector3(input.x, 0, input.y)
 	lead.drive(dir, sprint, delta)
 	other.follow(lead, sprint, delta)
+	grass.set_players(heroes[0].global_position, heroes[1].global_position)
 	_update_parcel(lead.global_position)
 
 
@@ -502,6 +521,7 @@ func _blob(pos: Vector3, radius: float, color: Color, parent: Node = self) -> Me
 
 
 func _collider(center: Vector3, size: Vector3) -> void:
+	_footprints.append(Rect2(center.x - size.x * 0.5, center.z - size.z * 0.5, size.x, size.z))
 	var body := StaticBody3D.new()
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
