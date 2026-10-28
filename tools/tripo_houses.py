@@ -27,7 +27,8 @@ FACE_LIMIT = 12000
 
 def call(method: str, path: str, body: dict | None = None) -> dict:
     req = urllib.request.Request(API + path, method=method, data=json.dumps(body).encode() if body else None)
-    req.add_header("Authorization", "Bearer " + os.environ["TRIPO_API_KEY"])
+    if os.environ.get("TRIPO_API_KEY"):
+        req.add_header("Authorization", "Bearer " + os.environ["TRIPO_API_KEY"])
     req.add_header("Content-Type", "application/json")
     with urllib.request.urlopen(req, timeout=60) as r:
         data = json.load(r)

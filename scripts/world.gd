@@ -60,6 +60,11 @@ func _ready() -> void:
 			var cap := preload("res://scripts/dev_capture.gd").new()
 			cap.output = arg.trim_prefix("--capture=")
 			add_child(cap)
+		elif arg.begins_with("--yaw="):
+			# Kamera für Testbilder drehen (Grad, 180 = Blick zur Straße)
+			rig.yaw = deg_to_rad(float(arg.trim_prefix("--yaw=")))
+		elif arg.begins_with("--zoom="):
+			rig.distance = float(arg.trim_prefix("--zoom="))
 
 
 # ---------------------------------------------------------------- Umgebung
@@ -274,9 +279,11 @@ func _build_hut() -> void:
 func _build_neighbourhood() -> void:
 	# Häuser aus assets/models/houses/ (z. B. von Tripo) ersetzen die ersten Häuser auf der anderen Straßenseite
 	var models := _house_models()
+	var slots := [4, 3, 5, 2, 6, 1, 7, 0, 8]   # von der Mitte (gegenüber dem Grundstück) nach außen
 	for i in 9:
-		if i < models.size():
-			_model_house(models[i], Vector3(-40 + i * 10, 0, 24.5), Vector2(8.0, 6.5), PI)
+		var m := slots.find(i)
+		if m < models.size():
+			_model_house(models[m], Vector3(-40 + i * 10, 0, 24.5), Vector2(8.0, 6.5), PI)
 			continue
 		_house(Vector3(-40 + i * 10 + (_rng.randf() - 0.5) * 2, 0, 24), Vector3(6 + _rng.randf() * 2, 3.4 + _rng.randf() * 1.6, 5), ROOF_COLORS[i % 6], false)
 	for x in [-20.0, -32.0, 20.0, 32.0]:
