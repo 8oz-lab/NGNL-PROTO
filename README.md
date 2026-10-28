@@ -59,7 +59,9 @@ Auf dem Desktop gibt es außerdem:
 | `assets/models/` | GLB-Modelle aus Tripo. Figuren: `sora_neu.glb`, `shiro_neu.glb`; fehlende Animationen kommen per Humanoid-Retargeting (`mixamo_bone_map.tres`) aus `sora.glb`/`shiro.glb` |
 | `assets/audio/teto/` | Tetos gesprochene Zeilen, erzeugt mit `tools/make_teto_voice.py` (Kokoro-TTS, Apache-2.0; Anleitung im Skript) |
 | `assets/models/trees/` | Baum-Modelle im Toon-Stil (Laubbaum, großer Laubbaum, Kirschbaum, Tanne, Birke, Busch), erzeugt mit `tools/make_trees.gd`; Vorschau: `tests/tree_preview.tscn` |
-| `assets/models/houses/` | Haus-Modelle (GLB) – jede Datei erscheint automatisch an der Straße; erzeugen mit `tools/tripo_houses.py` (Tripo-API: Schlüssel als Network secret für api.tripo3d.ai oder als `TRIPO_API_KEY`) |
+| `assets/models/houses/` | Haus-Modelle (GLB) – jede Datei erscheint automatisch an der Straße; erzeugen mit `tools/tripo_models.py houses` (Tripo-API: Schlüssel als Network secret für api.tripo3d.ai oder als `TRIPO_API_KEY`) |
+| `assets/models/buildings/` | Burg, Stadtmauer, Mauerturm, Stadttor (Tripo, `tools/tripo_models.py bauten`); ohne Dateien baut das Spiel einfache Ersatzformen |
+| `assets/shaders/sky.gdshader` | Anime-Himmel mit ziehenden Wolken; `distant.gdshader` für die riesigen Schachfiguren am Horizont |
 | `tools/fix_gltf_matrix.py` | Repariert GLB-Dateien, deren Knochen als Matrix gespeichert sind (sonst fällt das Skelett in Godot zusammen) |
 
 Der Spielstand wird beim Betreten der Hütte gespeichert (`user://save.json`).
@@ -77,7 +79,7 @@ godot --path . -- --start=fall --shots=bild.png --at=3,10
 godot --path . -- --demo=win --shots=bild.png --at=2,5,9
 ```
 
-springt in einen Teil des Intros (`desktop`, `break`, `fall`, `world`) bzw. spielt am Desktop direkt den Mattzug (`--demo=mail|welcome|chess|win`) und speichert Bilder zu den angegebenen Sekunden.
+springt in einen Teil des Intros (auf dem Grundstück zusätzlich `--cam=x,y,z,zx,zy,zz` für eine freie Kamera, `--yaw=` und `--zoom=`) (`desktop`, `break`, `fall`, `world`) bzw. spielt am Desktop direkt den Mattzug (`--demo=mail|welcome|chess|win`) und speichert Bilder zu den angegebenen Sekunden.
 
 ```
 godot --headless --script res://tests/test_chess.gd

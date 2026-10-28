@@ -9,6 +9,15 @@ const SHIRO_ANIMS := preload("res://assets/models/characters/shiro.glb")
 const QUEEN_SCENE := preload("res://assets/models/props/chess_queen.glb")
 const GROUND_SHADER := preload("res://assets/shaders/ground.gdshader")
 
+const BUILDINGS := "res://assets/models/buildings/"
+const DISTANT_SHADER := preload("res://assets/shaders/distant.gdshader")
+const CASTLE_POS := Vector3(6, 0, -80)
+const CASTLE_WIDTH := 52.0
+## Stadtmauer: Rechteck (x, z, Breite, Tiefe) um die ganze Spielwelt
+const WALL_RECT := Rect2(-84, -112, 168, 176)
+const WALL_HEIGHT := 8.0
+const ROAD_Z := 14.5
+
 const PARCEL := 6.0          # Kantenlänge einer Parzelle in Metern
 const HALF := 9.0            # halbe Breite des Grundstücks (3 × 6 m)
 const FENCE := HALF + 0.4
@@ -65,18 +74,33 @@ func _ready() -> void:
 			rig.yaw = deg_to_rad(float(arg.trim_prefix("--yaw=")))
 		elif arg.begins_with("--zoom="):
 			rig.distance = float(arg.trim_prefix("--zoom="))
+		elif arg.begins_with("--cam="):
+			# Freie Kamera für Übersichtsbilder: --cam=x,y,z,ziel_x,ziel_y,ziel_z
+			var v := Array(arg.trim_prefix("--cam=").split(",")).map(func(x): return float(x))
+			var cam := Camera3D.new()
+			cam.far = 3000.0
+			add_child(cam)
+			cam.look_at_from_position(Vector3(v[0], v[1], v[2]), Vector3(v[3], v[4], v[5]))
+			cam.make_current()
 
 
 # ---------------------------------------------------------------- Umgebung
 
 func _build_environment() -> void:
 	var env := Environment.new()
-	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color(0.32, 0.6, 0.95)
-	sky_mat.sky_horizon_color = Color(1.0, 0.86, 0.92)
-	sky_mat.ground_horizon_color = Color(1.0, 0.86, 0.92)
-	sky_mat.ground_bottom_color = Color(0.36, 0.5, 0.36)
+	var sky_mat := ShaderMaterial.new()
+	sky_mat.shader = preload("res://assets/shaders/sky.gdshader")
+	var clouds := NoiseTexture2D.new()
+	clouds.seamless = true
+	clouds.width = 512
+	clouds.height = 512
+	var cn := FastNoiseLite.new()
+	cn.frequency = 0.008
+	cn.fractal_octaves = 5
+	clouds.noise = cn
+	sky_mat.set_shader_parameter("cloud_noise", clouds)
 	var sky := Sky.new()
+	sky.process_mode = Sky.PROCESS_MODE_REALTIME
 	sky.sky_material = sky_mat
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
@@ -155,7 +179,7 @@ func _ramp(colors: Array, offsets: Array) -> Gradient:
 func _build_ground() -> void:
 	var ground := MeshInstance3D.new()
 	var plane := PlaneMesh.new()
-	plane.size = Vector2(240, 240)
+	plane.size = Vector2(900, 900)
 	ground.mesh = plane
 	var gm := ShaderMaterial.new()
 	gm.shader = GROUND_SHADER
@@ -302,14 +326,25 @@ func _build_neighbourhood() -> void:
 		if absf(bx) < FENCE + 2.0 and bz < 12.0:
 			continue
 		_tree("busch", Vector3(bx, 0, bz), 0.7 + _rng.randf() * 0.5)
-	# Waldrand in der Ferne
-	for i in 70:
-		var a := _rng.randf() * TAU
-		var d := 34.0 + _rng.randf() * 34.0
-		var pos := Vector3(cos(a) * d, 0, sin(a) * d)
-		if absf(pos.z - 14.5) < 5.0 or (absf(pos.x - 6.0) < 14.0 and pos.z < -60.0):
+	# Wald zwischen Stadt und Mauer
+	var placed := 0
+	var tries := 0
+	while placed < 170 and tries < 3000:
+		tries += 1
+		var pos := Vector3(_rng.randf_range(WALL_RECT.position.x + 7, WALL_RECT.end.x - 7), 0, _rng.randf_range(WALL_RECT.position.y + 7, WALL_RECT.end.y - 7))
+		if Vector2(pos.x, pos.z - 4.0).length() < 34.0 or absf(pos.z - ROAD_Z) < 5.5:
 			continue
-		_tree(_pick_forest(), pos, 0.85 + _rng.randf() * 0.45)
+		if absf(pos.x - CASTLE_POS.x) < CASTLE_WIDTH * 0.65 and absf(pos.z - CASTLE_POS.z) < CASTLE_WIDTH * 0.55:
+			continue
+		var free := true
+		for f in _footprints:
+			if f.grow(2.5).has_point(Vector2(pos.x, pos.z)):
+				free = false
+				break
+		if not free:
+			continue
+		_tree(_pick_forest(), pos, 0.85 + _rng.randf() * 0.5)
+		placed += 1
 
 	# Steinerne Schachdame als Denkmal an der Straße
 	var queen: Node3D = QUEEN_SCENE.instantiate()
@@ -320,9 +355,29 @@ func _build_neighbourhood() -> void:
 	_box(Vector3(2.0, 0.4, 2.0), Vector3(6.5, 0.2, 19.8), Color("a7a2b6"), 0.015)
 	_collider(Vector3(6.5, 1.5, 19.8), Vector3(2.0, 3.0, 2.0))
 
-	# Die Burg von Elkia in der Ferne
+	_build_castle()
+	_build_wall()
+	_build_horizon()
+
+
+# ---------------------------------------------------------------- Burg, Stadtmauer, Horizont
+
+## Burg von Elkia im Norden: Tripo-Modell, sonst die einfache Burg aus Grundformen.
+func _build_castle() -> void:
+	var path := BUILDINGS + "burg.glb"
+	if ResourceLoader.exists(path):
+		var castle := _prepared(load(path), 0.0, CASTLE_WIDTH)
+		castle.position = CASTLE_POS
+		add_child(castle)
+		var size: Vector3 = castle.get_meta("size")
+		_collider(CASTLE_POS + Vector3(0, size.y * 0.5, 0), Vector3(size.x * 0.8, size.y, size.z * 0.8))
+		return
+	_build_castle_simple()
+
+
+func _build_castle_simple() -> void:
 	var castle := Node3D.new()
-	castle.position = Vector3(6, 0, -75)
+	castle.position = CASTLE_POS
 	add_child(castle)
 	var stone := Color("e7e0f2")
 	_box(Vector3(18, 12, 10), Vector3(0, 6, 0), stone, 0.05, true, castle)
@@ -351,6 +406,145 @@ func _build_neighbourhood() -> void:
 		_box(Vector3(0.12, 3.0, 0.12), Vector3(0, 1.0, 0), Color("7a5a3a"), 0.0, false, flag)
 		_box(Vector3(2.0, 1.1, 0.05), Vector3(1.0, 1.9, 0), Color("e0405f"), 0.0, false, flag)
 		_flags.append(flag)
+
+
+
+
+## Stadtmauer um die ganze Spielwelt: Mauerstücke, Türme an Ecken und dazwischen, Stadttore
+## dort, wo die Straße die Mauer kreuzt. Unsichtbare Sperren verhindern, dass man hinausläuft.
+func _build_wall() -> void:
+	var r := WALL_RECT
+	var corners := [Vector3(r.position.x, 0, r.position.y), Vector3(r.end.x, 0, r.position.y), Vector3(r.end.x, 0, r.end.y), Vector3(r.position.x, 0, r.end.y)]
+	var wall_scene: PackedScene = load(BUILDINGS + "mauer.glb") if ResourceLoader.exists(BUILDINGS + "mauer.glb") else null
+	var tower_scene: PackedScene = load(BUILDINGS + "mauerturm.glb") if ResourceLoader.exists(BUILDINGS + "mauerturm.glb") else null
+	var gate_scene: PackedScene = load(BUILDINGS + "stadttor.glb") if ResourceLoader.exists(BUILDINGS + "stadttor.glb") else null
+	var gate_width := 16.0
+	for side in 4:
+		var a: Vector3 = corners[side]
+		var b: Vector3 = corners[(side + 1) % 4]
+		var dir := (b - a).normalized()
+		var length := a.distance_to(b)
+		var turn := atan2(-dir.z, dir.x)
+		# Lücken für Tore: Ost- und Westseite, wo die Straße (z = ROAD_Z) die Mauer kreuzt
+		var gaps := []
+		if absf(dir.x) < 0.5:
+			var t := (ROAD_Z - a.z) / (b.z - a.z) * length
+			gaps.append(Vector2(t - gate_width * 0.5, t + gate_width * 0.5))
+			var gate_pos := a + dir * t
+			if gate_scene:
+				var gate := _prepared(gate_scene, 0.0, gate_width)
+				gate.position = gate_pos
+				add_child(gate)
+			# Sperre im Torbogen, damit niemand die Welt verlässt
+			var outward := signf(gate_pos.x)
+			_collider(gate_pos + Vector3(outward * 4.0, 3, 0), Vector3(2, 6, gate_width))
+		# Mauerstücke zwischen den Lücken
+		var spans := []
+		var start := 0.0
+		for g in gaps:
+			spans.append(Vector2(start, g.x))
+			start = g.y
+		spans.append(Vector2(start, length))
+		for span in spans:
+			_wall_span(wall_scene, a + dir * span.x, dir, span.y - span.x, turn)
+		# Türme: an jeder Ecke und etwa alle 40 m
+		var count := maxi(1, int(round(length / 40.0)))
+		for i in count:
+			var t := length * i / count
+			var blocked := false
+			for g in gaps:
+				if t > g.x - 6.0 and t < g.y + 6.0:
+					blocked = true
+			if not blocked:
+				_wall_tower(tower_scene, a + dir * t)
+
+
+func _wall_span(scene: PackedScene, from: Vector3, dir: Vector3, length: float, turn: float) -> void:
+	if length < 1.0:
+		return
+	var center := from + dir * length * 0.5
+	var thick := 3.0
+	var size := Vector3(length if absf(dir.x) > 0.5 else thick, WALL_HEIGHT, thick if absf(dir.x) > 0.5 else length)
+	_collider(center + Vector3(0, WALL_HEIGHT * 0.5, 0), size)
+	if scene == null:
+		var box := _box(Vector3(length, WALL_HEIGHT, thick), Vector3.ZERO, Color("d9d3e6"), 0.04)
+		box.position = center + Vector3(0, WALL_HEIGHT * 0.5, 0)
+		box.rotation.y = turn
+		return
+	var probe := _prepared(scene, WALL_HEIGHT, 0.0, true, false)
+	var seg_len: float = probe.get_meta("size").x
+	probe.free()
+	var n := maxi(1, int(round(length / seg_len)))
+	for i in n:
+		var seg := _prepared(scene, WALL_HEIGHT, 0.0, true)
+		seg.position = from + dir * (length * (i + 0.5) / n)
+		seg.rotation.y = turn
+		seg.scale.x = length / n / seg_len
+		add_child(seg)
+
+
+func _wall_tower(scene: PackedScene, pos: Vector3) -> void:
+	_collider(pos + Vector3(0, WALL_HEIGHT * 0.7, 0), Vector3(5, WALL_HEIGHT * 1.4, 5))
+	if scene == null:
+		_box(Vector3(5, WALL_HEIGHT * 1.4, 5), pos + Vector3(0, WALL_HEIGHT * 0.7, 0), Color("e7e0f2"), 0.04)
+		return
+	var tower := _prepared(scene, WALL_HEIGHT * 1.7, 0.0)
+	tower.position = pos
+	add_child(tower)
+
+
+## Lädt ein Modell, legt es auf den Boden, zentriert es und skaliert es auf eine Höhe (oder Breite).
+## along_x: längste waagrechte Seite entlang X drehen (für Mauerstücke). Größe danach in Meta „size“.
+## toon: false nur zum Ausmessen (ohne Materialien)
+func _prepared(scene: PackedScene, height: float, width: float, along_x := false, toon := true) -> Node3D:
+	var holder := Node3D.new()
+	var model: Node3D = scene.instantiate()
+	holder.add_child(model)
+	var box := AABB()
+	var first := true
+	for mi in model.find_children("*", "MeshInstance3D", true, false):
+		var t := Transform3D.IDENTITY
+		var cur: Node = mi
+		while cur != holder:
+			if cur is Node3D:
+				t = (cur as Node3D).transform * t
+			cur = cur.get_parent()
+		var bb: AABB = t * (mi as MeshInstance3D).get_aabb()
+		box = bb if first else box.merge(bb)
+		first = false
+	var turned := along_x and box.size.z > box.size.x
+	var k := height / maxf(box.size.y, 0.01) if height > 0.0 else width / maxf(box.size.x, box.size.z)
+	model.scale *= k
+	model.position = Vector3(-box.get_center().x, -box.position.y, -box.get_center().z) * k
+	if turned:
+		var pivot := Node3D.new()
+		holder.remove_child(model)
+		pivot.add_child(model)
+		pivot.rotation.y = PI * 0.5
+		holder.add_child(pivot)
+	var size := box.size * k
+	holder.set_meta("size", Vector3(size.z, size.y, size.x) if turned else size)
+	if toon:
+		Toon.apply_to(model, 0.02 / k)
+	return holder
+
+
+## Riesige Schachfiguren am Horizont, wie überall in Disboard.
+func _build_horizon() -> void:
+	var pieces := [QUEEN_SCENE, preload("res://assets/models/props/chess_knight.glb"), preload("res://assets/models/props/chess_bishop.glb")]
+	var spots := [[-30.0, 620.0, 300.0], [25.0, 760.0, 380.0], [70.0, 560.0, 240.0], [140.0, 680.0, 320.0], [200.0, 600.0, 280.0], [255.0, 720.0, 360.0], [310.0, 640.0, 260.0]]
+	for i in spots.size():
+		var ang := deg_to_rad(spots[i][0])
+		var piece := _prepared(pieces[i % pieces.size()], spots[i][2], 0.0, false, false)
+		piece.position = Vector3(sin(ang), 0, -cos(ang)) * spots[i][1] + Vector3(0, -20, 0)
+		piece.rotation.y = randf() * TAU
+		var m := ShaderMaterial.new()
+		m.shader = DISTANT_SHADER
+		m.set_shader_parameter("height", spots[i][2])
+		for mi in piece.find_children("*", "MeshInstance3D", true, false):
+			(mi as MeshInstance3D).material_override = m
+			(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(piece)
 
 
 ## Alle GLB-Dateien im Ordner der Haus-Modelle (sortiert), auch in exportierten Spielen.

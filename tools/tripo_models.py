@@ -1,10 +1,11 @@
-# Erzeugt Häuser für Elkia mit der Tripo-API (Text zu 3D-Modell) und speichert sie als GLB in
-# assets/models/houses/. Das Spiel stellt jede GLB aus diesem Ordner automatisch an die Straße.
+# Erzeugt Modelle für Elkia mit der Tripo-API (Text zu 3D-Modell) und speichert sie als GLB.
+#   houses:  assets/models/houses/     – das Spiel stellt jede GLB von dort automatisch an die Straße
+#   bauten:  assets/models/buildings/  – Burg, Stadtmauer, Mauerturm, Stadttor
 #
 # Voraussetzungen: Netzwerkzugriff auf api.tripo3d.ai (und den Download-Host der fertigen Modelle)
 # und der Tripo-Schlüssel: entweder als „Network secret“ der Umgebung (wird automatisch als
 # Authorization-Header angehängt) oder als Umgebungsvariable TRIPO_API_KEY.
-# Aufruf: python3 tools/tripo_houses.py [name ...]   (ohne Namen: alle aus HOUSES)
+# Aufruf: python3 tools/tripo_models.py SET [name ...]   (ohne Namen: alle Modelle des Sets)
 import json
 import os
 import sys
@@ -14,7 +15,7 @@ from pathlib import Path
 
 API = "https://api.tripo3d.ai/v2/openapi"
 STYLE = ("stylized anime fantasy game asset, medieval european town, clean shapes, soft pastel colors, "
-         "hand-painted look, single building on a small flat base, no people, no background")
+         "hand-painted look, single object, no people, no background")
 HOUSES = {
     "stadthaus_blau": "two-story town house, white plaster walls with dark timber frame, steep blue slate roof, wooden door, flower boxes under the windows",
     "stadthaus_rot": "narrow three-story town house, cream walls, timber frame, red tiled roof with small dormer, round window in the gable",
@@ -22,7 +23,19 @@ HOUSES = {
     "taverne": "cozy tavern, stone and wood, wide porch with wooden pillars, chimney, hanging sign with a chess piece, green roof",
     "wohnhaus_klein": "small cottage, white walls, dark wooden beams, purple roof, chimney, little fence-free front step",
 }
-FACE_LIMIT = 12000
+BAUTEN = {
+    "burg": ("grand fairy-tale royal castle of a human kingdom, white stone walls, many slender round towers with blue conical roofs, "
+             "red banners, large main keep and gatehouse, standing on a low rocky hill base", 30000),
+    "mauer": ("long straight segment of a medieval stone city wall, crenellated battlements on top, light grey stone blocks, "
+              "simple flat ends so segments can be placed in a row, about four times longer than high", 6000),
+    "mauerturm": ("round medieval stone wall tower with crenellations and a blue conical roof, light grey stone, small arrow slits", 8000),
+    "stadttor": ("medieval city gatehouse with one large open arched gateway in the middle, two round towers with blue conical roofs, "
+                 "light grey stone, open wooden gate doors, red banners", 15000),
+}
+SETS = {
+    "houses": ("assets/models/houses", {k: (v, 12000) for k, v in HOUSES.items()}),
+    "bauten": ("assets/models/buildings", BAUTEN),
+}
 
 
 def call(method: str, path: str, body: dict | None = None) -> dict:
@@ -47,9 +60,9 @@ def find_glb(output: dict) -> str | None:
     return None
 
 
-def generate(name: str, prompt: str, out: Path) -> None:
+def generate(name: str, prompt: str, faces: int, out: Path) -> None:
     task = call("POST", "/task", {"type": "text_to_model", "prompt": f"{prompt}, {STYLE}",
-                                  "texture": True, "pbr": False, "face_limit": FACE_LIMIT})
+                                  "texture": True, "pbr": False, "face_limit": faces})
     task_id = task["task_id"]
     print(f"{name}: Auftrag {task_id} gestartet")
     while True:
@@ -70,11 +83,12 @@ def generate(name: str, prompt: str, out: Path) -> None:
 
 
 def main() -> None:
-    out = Path(__file__).resolve().parent.parent / "assets/models/houses"
+    folder, models = SETS[sys.argv[1]]
+    out = Path(__file__).resolve().parent.parent / folder
     out.mkdir(parents=True, exist_ok=True)
-    names = sys.argv[1:] or list(HOUSES)
-    for name in names:
-        generate(name, HOUSES[name], out)
+    for name in sys.argv[2:] or list(models):
+        prompt, faces = models[name]
+        generate(name, prompt, faces, out)
 
 
 if __name__ == "__main__":
