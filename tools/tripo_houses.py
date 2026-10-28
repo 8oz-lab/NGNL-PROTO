@@ -1,8 +1,9 @@
 # Erzeugt Häuser für Elkia mit der Tripo-API (Text zu 3D-Modell) und speichert sie als GLB in
 # assets/models/houses/. Das Spiel stellt jede GLB aus diesem Ordner automatisch an die Straße.
 #
-# Voraussetzungen: Umgebungsvariable TRIPO_API_KEY, Netzwerkzugriff auf api.tripo3d.ai
-# (und den Download-Host der fertigen Modelle).
+# Voraussetzungen: Netzwerkzugriff auf api.tripo3d.ai (und den Download-Host der fertigen Modelle)
+# und der Tripo-Schlüssel: entweder als „Network secret“ der Umgebung (wird automatisch als
+# Authorization-Header angehängt) oder als Umgebungsvariable TRIPO_API_KEY.
 # Aufruf: python3 tools/tripo_houses.py [name ...]   (ohne Namen: alle aus HOUSES)
 import json
 import os
