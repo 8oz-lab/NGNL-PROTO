@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://ctdp2rd4cvlx"
-path="res://.godot/imported/wohnhaus_klein_Color_b60c4c2f-00e3-44a2-b907-30eacc519781.jpg-09985ec7cb73199e5e9865d4091ad5cd.ctex"
+path.s3tc="res://.godot/imported/wohnhaus_klein_Color_b60c4c2f-00e3-44a2-b907-30eacc519781.jpg-09985ec7cb73199e5e9865d4091ad5cd.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "5e1fbb3816da6c0aad8e1efa0d7fbc29"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/houses/wohnhaus_klein_Color_b60c4c2f-00e3-44a2-b907-30eacc519781.jpg"
-dest_files=["res://.godot/imported/wohnhaus_klein_Color_b60c4c2f-00e3-44a2-b907-30eacc519781.jpg-09985ec7cb73199e5e9865d4091ad5cd.ctex"]
+dest_files=["res://.godot/imported/wohnhaus_klein_Color_b60c4c2f-00e3-44a2-b907-30eacc519781.jpg-09985ec7cb73199e5e9865d4091ad5cd.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0
