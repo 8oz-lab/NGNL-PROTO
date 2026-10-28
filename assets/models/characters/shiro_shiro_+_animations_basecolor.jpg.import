@@ -3,24 +3,27 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://ipj1hd70rdov"
-path="res://.godot/imported/shiro_shiro_+_animations_basecolor.jpg-e6a164564e5dffc1894cf9b8ac887e82.ctex"
+path.s3tc="res://.godot/imported/shiro_shiro_+_animations_basecolor.jpg-e6a164564e5dffc1894cf9b8ac887e82.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
-"md5": "d39d1db50600d67d60b5ae7de811df58"
+"md5": "b405d463dfae5f07fdae846c4d9dceb5"
 }
 
 [deps]
 
 source_file="res://assets/models/characters/shiro_shiro_+_animations_basecolor.jpg"
-dest_files=["res://.godot/imported/shiro_shiro_+_animations_basecolor.jpg-e6a164564e5dffc1894cf9b8ac887e82.ctex"]
+dest_files=["res://.godot/imported/shiro_shiro_+_animations_basecolor.jpg-e6a164564e5dffc1894cf9b8ac887e82.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
+compress/uastc_level=0
+compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
@@ -28,10 +31,14 @@ mipmaps/generate=true
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""
+process/channel_remap/red=0
+process/channel_remap/green=1
+process/channel_remap/blue=2
+process/channel_remap/alpha=3
 process/fix_alpha_border=true
 process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0
