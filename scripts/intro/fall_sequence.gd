@@ -548,7 +548,9 @@ func _advance() -> void:
 		return
 	var total: int = LINES[line][1].length()
 	if typed < total:
+		# ganzen Satz sofort zeigen
 		typed = total
+		text_label.visible_characters = -1
 	else:
 		_next_line()
 
@@ -762,6 +764,7 @@ func _finish() -> void:
 	_done = true
 	_voice.stop()
 	Flow.stop_loop("wind", 1.0)
+	Flow.arrived_from_intro = true   # nach dem Sturz beginnt Tetos Steuerungs-Training
 	Flow.goto("world", Color.WHITE, 0.6, 1.4)
 
 
