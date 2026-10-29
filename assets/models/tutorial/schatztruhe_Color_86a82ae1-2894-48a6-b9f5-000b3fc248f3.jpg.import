@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dtegab0rtpp0d"
-path="res://.godot/imported/schatztruhe_Color_86a82ae1-2894-48a6-b9f5-000b3fc248f3.jpg-28e6a1e4e8549de0f4631509cd7f95a9.ctex"
+path.s3tc="res://.godot/imported/schatztruhe_Color_86a82ae1-2894-48a6-b9f5-000b3fc248f3.jpg-28e6a1e4e8549de0f4631509cd7f95a9.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "18bf49faf2243373b25638b8b7163b04"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/tutorial/schatztruhe_Color_86a82ae1-2894-48a6-b9f5-000b3fc248f3.jpg"
-dest_files=["res://.godot/imported/schatztruhe_Color_86a82ae1-2894-48a6-b9f5-000b3fc248f3.jpg-28e6a1e4e8549de0f4631509cd7f95a9.ctex"]
+dest_files=["res://.godot/imported/schatztruhe_Color_86a82ae1-2894-48a6-b9f5-000b3fc248f3.jpg-28e6a1e4e8549de0f4631509cd7f95a9.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

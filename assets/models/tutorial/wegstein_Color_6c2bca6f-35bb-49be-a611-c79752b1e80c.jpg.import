@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dna2vjgrh6k3s"
-path="res://.godot/imported/wegstein_Color_6c2bca6f-35bb-49be-a611-c79752b1e80c.jpg-54f3973b63b4def22ce5a9b82e12afc5.ctex"
+path.s3tc="res://.godot/imported/wegstein_Color_6c2bca6f-35bb-49be-a611-c79752b1e80c.jpg-54f3973b63b4def22ce5a9b82e12afc5.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "3edac26a86e2b6fb3a011adf411e5e68"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/tutorial/wegstein_Color_6c2bca6f-35bb-49be-a611-c79752b1e80c.jpg"
-dest_files=["res://.godot/imported/wegstein_Color_6c2bca6f-35bb-49be-a611-c79752b1e80c.jpg-54f3973b63b4def22ce5a9b82e12afc5.ctex"]
+dest_files=["res://.godot/imported/wegstein_Color_6c2bca6f-35bb-49be-a611-c79752b1e80c.jpg-54f3973b63b4def22ce5a9b82e12afc5.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0
