@@ -60,22 +60,6 @@ void fragment() {
 }
 """
 
-const SEA_SHADER := """
-shader_type spatial;
-render_mode diffuse_toon, specular_disabled;
-uniform sampler2D noise_tex : repeat_enable;
-varying float h;
-void vertex() {
-	vec2 w = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xz;
-	h = texture(noise_tex, w * 0.00035).r * 0.7 + texture(noise_tex, w * 0.0013).r * 0.3;
-	VERTEX.y += h * 140.0;
-}
-void fragment() {
-	ALBEDO = mix(vec3(0.52, 0.58, 0.9), vec3(1.0, 0.98, 0.96), smoothstep(0.38, 0.72, h));
-	ROUGHNESS = 1.0;
-}
-"""
-
 var cam: Camera3D
 var env: Environment
 var noise: NoiseTexture2D
@@ -83,6 +67,14 @@ var clouds: Array = []
 var buddies: Array = []     # kleine Schachfiguren, die mit euch fallen
 var island: Node3D
 var island_top := Vector3(0, 120, 0)
+var floaters: Array = []
+var dragons: Array = []
+
+const CITY_MODEL := "res://assets/models/sky/hauptstadt.glb"
+const ISLE_MODEL := "res://assets/models/sky/schwebeinsel.glb"
+const DRAGON_MODEL := "res://assets/models/sky/drache.glb"
+## Drehung, damit die Nase des Drachen-Modells in Flugrichtung (-Z) zeigt
+const DRAGON_YAW := PI * 0.5
 
 var line := -1
 var typed := 0.0
@@ -104,6 +96,16 @@ var numeral: Label
 var hint: Label
 var orb: Control
 
+## Teto schwebt rechts vor der Kamera mit (Modell aus tools/tripo_models.py figuren)
+const TETO_MODEL := "res://assets/models/characters/teto.glb"
+const TETO_OFFSET := Vector3(2.2, -0.25, -5.3)
+var teto: Node3D
+var _teto_model: Node3D
+var _teto_spark: CPUParticles3D
+var _teto_light: OmniLight3D
+var _teto_pos := Vector3.ZERO   # Platz relativ zur Kamera
+var _teto_away := 0.0
+
 
 func _ready() -> void:
 	noise = NoiseTexture2D.new()
@@ -115,17 +117,19 @@ func _ready() -> void:
 	fn.fractal_octaves = 4
 	noise.noise = fn
 	_build_environment()
-	_build_sea()
+	_build_terrain()
 	_build_landmarks()
-	_build_island()
+	_build_city()
+	_build_sky_figures()
 	_build_clouds()
 	_build_buddies()
 	cam = Camera3D.new()
 	cam.fov = 68.0
-	cam.far = 12000.0
+	cam.far = 24000.0
 	add_child(cam)
 	cam.current = true
 	_build_speed_lines()
+	_build_teto()
 	_build_ui()
 	_voice = AudioStreamPlayer.new()
 	_voice.volume_db = 1.0
@@ -138,28 +142,11 @@ func _ready() -> void:
 # ------------------------------------------------------------------ Welt
 
 func _build_environment() -> void:
-	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color(0.16, 0.36, 0.9)
-	sky_mat.sky_horizon_color = Color(0.78, 0.86, 1.0)
-	sky_mat.sky_curve = 0.12
-	sky_mat.ground_bottom_color = Color(0.55, 0.6, 0.92)
-	sky_mat.ground_horizon_color = Color(0.82, 0.86, 1.0)
-	sky_mat.sun_angle_max = 20.0
-	var sky := Sky.new()
-	sky.sky_material = sky_mat
 	env = Environment.new()
-	env.background_mode = Environment.BG_SKY
-	env.sky = sky
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.72, 0.74, 1.0)
-	env.ambient_light_energy = 0.55
+	SkyLook.apply(env, 0.00006)
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_white = 2.2
-	env.fog_enabled = true
-	env.fog_light_color = Color(0.78, 0.84, 1.0)
-	env.fog_density = 0.000045
-	env.fog_aerial_perspective = 0.35
-	env.fog_sky_affect = 0.0
+	env.fog_aerial_perspective = 0.5
 	env.glow_enabled = true
 	env.glow_intensity = 0.5
 	env.glow_hdr_threshold = 1.1
@@ -167,27 +154,36 @@ func _build_environment() -> void:
 	we.environment = env
 	add_child(we)
 	var sun := DirectionalLight3D.new()
-	sun.light_color = Color(1.0, 0.95, 0.86)
-	sun.light_energy = 1.0
-	sun.rotation_degrees = Vector3(-42, -35, 0)
+	sun.light_color = Color(1.0, 0.94, 0.84)
+	sun.light_energy = 1.05
+	sun.rotation_degrees = Vector3(-38, -35, 0)
 	add_child(sun)
 
 
-func _build_sea() -> void:
-	var mi := MeshInstance3D.new()
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(40000, 40000)
-	plane.subdivide_width = 220
-	plane.subdivide_depth = 220
-	mi.mesh = plane
-	var m := ShaderMaterial.new()
-	var s := Shader.new()
-	s.code = SEA_SHADER
-	m.shader = s
-	m.set_shader_parameter("noise_tex", noise)
-	mi.material_override = m
-	mi.position.y = -60
-	add_child(mi)
+## Landschaft mit Meer, Küsten, Wiesen, Wäldern und Bergen (Höhe im Shader, siehe terrain_height.gdshaderinc).
+func _build_terrain() -> void:
+	var tn := NoiseTexture2D.new()
+	tn.seamless = true
+	tn.width = 1024
+	tn.height = 1024
+	var fn := FastNoiseLite.new()
+	fn.frequency = 0.004
+	fn.fractal_octaves = 5
+	tn.noise = fn
+	for spec in [["terrain", Vector2(30000, 30000), 420], ["ocean", Vector2(60000, 60000), 60]]:
+		var mi := MeshInstance3D.new()
+		var plane := PlaneMesh.new()
+		plane.size = spec[1]
+		plane.subdivide_width = spec[2]
+		plane.subdivide_depth = spec[2]
+		mi.mesh = plane
+		var m := ShaderMaterial.new()
+		m.shader = load("res://assets/shaders/%s.gdshader" % spec[0])
+		m.set_shader_parameter("terrain_noise", tn)
+		mi.material_override = m
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.extra_cull_margin = 2000.0
+		add_child(mi)
 
 
 ## Riesige Schachfiguren am Horizont, wie im Anime.
@@ -240,19 +236,74 @@ func _rel(root: Node3D, n: Node3D) -> Transform3D:
 	return t
 
 
-func _build_island() -> void:
-	var scene: PackedScene = load("res://assets/models/props/island.glb")
-	var model: Node3D = scene.instantiate()
+## Die Hauptstadt Elkia auf der Anhöhe in der Mitte (Tripo-Modell); ohne Modell die alte Insel.
+func _build_city() -> void:
+	var path := CITY_MODEL if ResourceLoader.exists(CITY_MODEL) else "res://assets/models/props/island.glb"
+	var model: Node3D = load(path).instantiate()
 	var box := _aabb(model)
-	var k := 520.0 / maxf(box.size.x, box.size.z)
+	var width := 800.0 if path == CITY_MODEL else 520.0
+	var k := width / maxf(box.size.x, box.size.z)
 	island = Node3D.new()
 	model.scale = Vector3.ONE * k
-	model.position = -box.get_center() * k
+	model.position = Vector3(-box.get_center().x, -box.position.y, -box.get_center().z) * k
 	island.add_child(model)
 	Toon.apply_to(model, 0.0)
-	island.position = Vector3(0, box.size.y * k * 0.5 - 20.0, 0)
+	island.position = Vector3(0, 28.0 if path == CITY_MODEL else box.size.y * k * 0.5 + 60.0, 0)
 	add_child(island)
-	island_top = Vector3(0, island.position.y + box.size.y * k * 0.5, 0)
+	island_top = Vector3(0, island.position.y + box.size.y * k * 0.75, 0)
+
+
+## Schwebeinseln, schwebende Riesen-Schachfiguren und kreisende Drachen.
+func _build_sky_figures() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 77
+	if ResourceLoader.exists(ISLE_MODEL):
+		for i in 7:
+			var ang := rng.randf() * TAU
+			var isle := _fit(load(ISLE_MODEL).instantiate(), rng.randf_range(160, 380))
+			Toon.apply_to(isle, 0.0)
+			isle.position = Vector3(cos(ang), 0, sin(ang)) * rng.randf_range(1400, 4200) + Vector3(0, rng.randf_range(450, 1700), 0)
+			isle.rotation.y = rng.randf() * TAU
+			add_child(isle)
+			floaters.append({"node": isle, "base": isle.position, "phase": rng.randf() * TAU, "spin": rng.randf_range(-0.01, 0.01)})
+	var pieces := ["res://assets/models/props/chess_knight.glb", "res://assets/models/props/chess_queen.glb", "res://assets/models/props/chess_bishop.glb", "res://assets/models/props/chess_knight.glb"]
+	var tints := [Color(0.95, 0.9, 1.0), Color(0.55, 0.72, 1.0), Color(1.0, 0.85, 0.6), Color(0.7, 0.95, 0.85)]
+	for i in pieces.size():
+		var ang := TAU * i / pieces.size() + 0.6
+		var piece := _fit(load(pieces[i]).instantiate(), rng.randf_range(260, 480))
+		Toon.apply_to(piece, 0.0, tints[i])
+		piece.position = Vector3(cos(ang), 0, sin(ang)) * rng.randf_range(1800, 3600) + Vector3(0, rng.randf_range(900, 1800), 0)
+		piece.rotation = Vector3(rng.randf_range(-0.6, 0.6), rng.randf() * TAU, rng.randf_range(-0.6, 0.6))
+		add_child(piece)
+		floaters.append({"node": piece, "base": piece.position, "phase": rng.randf() * TAU, "spin": rng.randf_range(-0.03, 0.03)})
+	if ResourceLoader.exists(DRAGON_MODEL):
+		for i in 2:
+			var dragon := Node3D.new()
+			var body := _fit(load(DRAGON_MODEL).instantiate(), 1.0)
+			# auf etwa 140 m Spannweite bringen
+			var box := _aabb(body)
+			body.scale = Vector3.ONE * 140.0 / maxf(box.size.x, box.size.z)
+			body.rotation.y = DRAGON_YAW
+			Toon.apply_to(body, 0.0)
+			dragon.add_child(body)
+			add_child(dragon)
+			dragons.append({"node": dragon, "radius": 1500.0 + i * 1300.0, "height": 1300.0 - i * 450.0, "speed": 0.035 - i * 0.012, "angle": i * PI})
+
+
+func _update_sky_figures(delta: float) -> void:
+	for f in floaters:
+		var n: Node3D = f["node"]
+		n.position = f["base"] + Vector3(0, sin(_t * 0.4 + f["phase"]) * 12.0, 0)
+		n.rotation.y += f["spin"] * delta
+	for d in dragons:
+		d["angle"] += d["speed"] * delta
+		var a: float = d["angle"]
+		var n: Node3D = d["node"]
+		var pos := Vector3(cos(a) * d["radius"], d["height"] + sin(a * 3.0) * 40.0, sin(a) * d["radius"])
+		var ahead := Vector3(cos(a + 0.05) * d["radius"], d["height"], sin(a + 0.05) * d["radius"])
+		n.position = pos
+		n.look_at(ahead, Vector3.UP)
+		n.rotate_object_local(Vector3.FORWARD, -0.25)   # in die Kurve legen
 
 
 func _build_clouds() -> void:
@@ -427,6 +478,8 @@ func _next_line() -> void:
 	if line >= LINES.size():
 		_start_dive()
 		return
+	if line == 0:
+		_teto_appear()
 	var l: Array = LINES[line]
 	text_label.text = l[1]
 	text_label.visible_characters = 0
@@ -466,6 +519,7 @@ func _speak() -> void:
 
 func _start_dive() -> void:
 	_dive = 0.0
+	_teto_leave()
 	create_tween().tween_property(panel, "modulate:a", 0.0, 0.6)
 	create_tween().tween_property(numeral, "modulate:a", 0.0, 0.4)
 	create_tween().tween_property(hint, "modulate:a", 0.0, 0.6)
@@ -525,8 +579,119 @@ func _process(delta: float) -> void:
 		if _dive > DIVE_TIME:
 			_finish()
 	_place_camera(delta)
+	_update_teto(delta)
+	_update_sky_figures(delta)
 	_update_clouds()
 	_update_buddies(delta)
+
+
+# ------------------------------------------------------------------ Teto als Figur
+
+func _build_teto() -> void:
+	teto = Node3D.new()
+	add_child(teto)
+	if ResourceLoader.exists(TETO_MODEL):
+		var m: Node3D = load(TETO_MODEL).instantiate()
+		var pivot := Node3D.new()
+		pivot.rotation.y = PI * 0.5   # das Modell schaut in +X; so zeigt die Vorderseite zur Kamera
+		teto.add_child(pivot)
+		pivot.add_child(m)
+		var box := _aabb(m)
+		var k := 1.6 / maxf(box.size.y, 0.01)
+		m.scale = Vector3.ONE * k
+		m.position = -box.get_center() * k
+		Toon.apply_to(m, 0.008 / k)
+		_teto_model = pivot
+	else:
+		# Ersatz ohne Modell: leuchtender Stern
+		var star := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.35
+		sm.height = 0.7
+		star.mesh = sm
+		star.material_override = Toon.glow(Color(1.0, 0.85, 0.45), 2.0)
+		teto.add_child(star)
+		_teto_model = star
+	_teto_light = OmniLight3D.new()
+	_teto_light.light_color = Color(1.0, 0.86, 0.6)
+	_teto_light.light_energy = 1.2
+	_teto_light.omni_range = 4.0
+	teto.add_child(_teto_light)
+	# Funkelspur
+	_teto_spark = CPUParticles3D.new()
+	_teto_spark.amount = 40
+	_teto_spark.lifetime = 1.4
+	_teto_spark.local_coords = false
+	_teto_spark.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	_teto_spark.emission_sphere_radius = 0.6
+	_teto_spark.direction = Vector3.UP
+	_teto_spark.spread = 180.0
+	_teto_spark.initial_velocity_min = 0.2
+	_teto_spark.initial_velocity_max = 0.8
+	_teto_spark.gravity = Vector3(0, 2.0, 0)   # Sturz: Funken „steigen“ relativ zu uns
+	_teto_spark.scale_amount_min = 0.5
+	_teto_spark.scale_amount_max = 1.2
+	var q := QuadMesh.new()
+	q.size = Vector2(0.07, 0.07)
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.vertex_color_use_as_albedo = true
+	q.material = mat
+	_teto_spark.mesh = q
+	var grad := Gradient.new()
+	grad.set_color(0, Color(1.0, 0.95, 0.7, 1.0))
+	grad.set_color(1, Color(0.6, 0.8, 1.0, 0.0))
+	_teto_spark.color_ramp = grad
+	_teto_spark.emitting = false
+	teto.add_child(_teto_spark)
+	teto.scale = Vector3.ONE * 0.01   # erst nach dem Ausmessen klein machen; taucht beim ersten Satz auf
+	teto.visible = false
+
+
+func _teto_appear() -> void:
+	_teto_pos = TETO_OFFSET
+	teto.global_position = cam.global_transform * _teto_pos
+	teto.visible = true
+	_teto_spark.emitting = true
+	Flow.play("welcome", -10, 1.4)
+	var burst := _teto_spark.duplicate() as CPUParticles3D
+	burst.one_shot = true
+	burst.explosiveness = 1.0
+	burst.amount = 60
+	burst.initial_velocity_min = 2.0
+	burst.initial_velocity_max = 4.0
+	burst.emitting = true
+	teto.add_child(burst)
+	var tw := create_tween()
+	tw.tween_property(teto, "scale", Vector3.ONE * 1.15, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(teto, "scale", Vector3.ONE, 0.2)
+
+
+func _teto_leave() -> void:
+	var tw := create_tween()
+	tw.tween_property(self, "_teto_away", 1.0, 1.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func(): _teto_spark.emitting = false)
+	tw.parallel().tween_property(teto, "scale", Vector3.ONE * 0.01, 0.5).set_delay(1.1)
+	tw.tween_callback(func(): teto.visible = false)
+
+
+func _update_teto(delta: float) -> void:
+	if not teto.visible:
+		return
+	# schwebt weich hinter seinem Platz vor der Kamera her, beim Abschied nach oben davon
+	# geglättet relativ zur Kamera, damit Teto auch bei schnellem Kameraflug mithält
+	var offset := TETO_OFFSET + Vector3(0, sin(_t * 1.8) * 0.18 + _teto_away * 9.0, _teto_away * -6.0)
+	_teto_pos = _teto_pos.lerp(offset, clampf(delta * 5.0, 0.0, 1.0))
+	teto.global_position = cam.global_transform * _teto_pos
+	teto.look_at(cam.global_position, Vector3.UP)
+	var talking: bool = _voice.playing or (line >= 0 and line < LINES.size() and typed < LINES[line][1].length())
+	var bounce := sin(_t * 13.0) * 0.035 if talking else 0.0
+	_teto_model.rotation.z = sin(_t * 1.3) * 0.08
+	_teto_model.rotation.x = sin(_t * 0.9) * 0.05
+	_teto_model.scale = Vector3(1.0 - bounce * 0.5, 1.0 + bounce, 1.0 - bounce * 0.5)
+	_teto_light.light_energy = 1.0 + (0.6 if talking else 0.0) + sin(_t * 3.0) * 0.15
 
 
 ## Höhe hängt vom Fortschritt des Gesprächs ab, am Ende folgt der Sturzflug auf die Insel.
@@ -547,16 +712,21 @@ func _place_camera(delta: float) -> void:
 	_prog_smooth = lerpf(_prog_smooth, _progress(), clampf(delta * 0.8, 0.0, 1.0))
 	_yaw += delta * 0.05
 	var alt := lerpf(ALT_START, ALT_TALK_END, _prog_smooth) - _t * 2.0
-	var radius := lerpf(420.0, 240.0, _prog_smooth)
-	var pitch := deg_to_rad(-27.0)
+	# weit genug draußen, dass die Hauptstadt vor uns liegt und der Horizont im Bild bleibt
+	var radius := lerpf(3000.0, 1000.0, _prog_smooth)
 	if _dive >= 0.0:
 		var k := clampf(_dive / DIVE_TIME, 0.0, 1.0)
 		var e := k * k * (3.0 - 2.0 * k)
-		alt = lerpf(ALT_TALK_END - _t * 2.0, island_top.y + 25.0, e)
-		radius = lerpf(240.0, 30.0, e)
-		pitch = deg_to_rad(lerpf(-27.0, -68.0, e))
+		# endet hoch genug über der Stadt, dass sie scharf bleibt; den Rest übernimmt der weiße Blitz
+		alt = lerpf(ALT_TALK_END - _t * 2.0, island_top.y + 160.0, e)
+		radius = lerpf(1000.0, 30.0, e)
 		cam.fov = lerpf(68.0, 80.0, e)
 	var pos := Vector3(cos(_yaw) * radius, alt, sin(_yaw) * radius)
+	# Neigung: die Stadt etwas unter der Bildmitte, oberhalb des Textfelds
+	var down := atan2(island_top.y - alt, radius)
+	var pitch := clampf(down + deg_to_rad(9.0), deg_to_rad(-60.0), deg_to_rad(-16.0))
+	if _dive >= 0.0:
+		pitch = lerpf(pitch, deg_to_rad(-70.0), clampf(_dive / DIVE_TIME, 0.0, 1.0))
 	# Blick Richtung Inselmitte, sanftes Taumeln im Wind
 	var to := (island_top - pos)
 	var heading := atan2(-to.x, -to.z)

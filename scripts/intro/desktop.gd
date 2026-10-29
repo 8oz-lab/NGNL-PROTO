@@ -407,8 +407,24 @@ func _open_app(kind: String) -> void:
 	_show_window(w)
 
 
-func _secret_skip() -> void:
-	Flow.goto("world", Color.WHITE, 0.5, 0.8)
+## Testcode aus dem Browser: „break“ = der Bildschirm reißt und man wird in den PC gezogen
+## (weiter mit Sturz und Landung), „world“ = direkt aufs Grundstück.
+func _secret_skip(target: String) -> void:
+	if target == "world":
+		Flow.goto("world", Color.WHITE, 0.5, 0.8)
+		return
+	var screen := Rect2(Vector2.ZERO, size)
+	Flow.play("crack")
+	crack_layer.start(screen.get_center(), screen.grow(-size.y * 0.3))
+	var shake := create_tween().set_loops(12)
+	shake.tween_property(self, "position", Vector2(randf_range(-6, 6), randf_range(-4, 4)), 0.04)
+	shake.tween_property(self, "position", Vector2.ZERO, 0.04)
+	await get_tree().create_timer(1.5).timeout
+	Flow.play("shatter", -8)
+	await get_tree().create_timer(0.3).timeout
+	await RenderingServer.frame_post_draw
+	Flow.screen_capture = get_viewport().get_texture().get_image()
+	get_tree().change_scene_to_file(Flow.SCENES["break"])
 
 
 func _open_folder(id: String) -> void:
