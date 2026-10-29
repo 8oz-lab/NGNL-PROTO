@@ -10,6 +10,8 @@ const SCENES := {
 
 ## Bild vom Bildschirm im Moment des Schachsiegs (für den zerbrechenden Monitor)
 var screen_capture: Image
+## Gerade aus dem Intro (Sturz) gelandet: dann startet das Steuerungs-Training immer
+var arrived_from_intro := false
 
 var _fade: ColorRect
 var _players: Array[AudioStreamPlayer] = []

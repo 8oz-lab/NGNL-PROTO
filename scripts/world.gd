@@ -65,7 +65,9 @@ func _ready() -> void:
 	_build_grass()
 	_spawn_heroes()
 	# Steuerungs-Training beim ersten Mal (oder mit `-- --tutorial`)
-	if not GameState.tutorial_done or OS.get_cmdline_user_args().has("--tutorial"):
+	# Steuerungs-Training: nach jedem Sturz aus dem Intro, sonst nur solange es noch nicht geschafft ist
+	if Flow.arrived_from_intro or not GameState.tutorial_done or OS.get_cmdline_user_args().has("--tutorial"):
+		Flow.arrived_from_intro = false
 		get_tree().create_timer(4.5).timeout.connect(_start_tutorial)
 	# Entwicklerhilfe: `-- --capture=bild.png` speichert nach kurzer Zeit ein Bild und beendet das Spiel
 	for arg in OS.get_cmdline_user_args():
