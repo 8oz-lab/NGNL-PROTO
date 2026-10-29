@@ -28,6 +28,7 @@ Der SessionStart-Hook installiert Godot 4.7 als `godot` und importiert das Proje
 - **Tests:** `godot --headless --path . --script res://tests/test_chess.gd` (Perft),
   `godot --headless --path . -- --start=world --tutorial --probe=res://tests/tutorial_bot.gd` (Training komplett),
   `xvfb-run -a godot --path . --rendering-driver opengl3 res://tests/desktop_test.tscn` (Desktop-Klicks; verändert `desktop.json`).
+- **Leertaste im Sturz:** `-- --start=fall --probe=res://tests/space_probe.gd --plan=k8,s8.4,q9 --out=/pfad/bild` (k = Leertaste, s = Bild, q = Ende; Zeiten in s; mit xvfb-run wie Testbilder).
 - **Testbilder** (llvmpipe, ca. 2 Bilder/s – lange Läufe im Hintergrund starten):
   `xvfb-run -a -s "-screen 0 1600x900x24" godot --rendering-driver opengl3 --path . --resolution 1600x900 -- --start=fall --shots=/pfad/bild.png --at=5,40`
 - Entwickler-Argumente: `--start=desktop|break|fall|world`, `--shots=` + `--at=`, `--probe=res://…gd`,

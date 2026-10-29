@@ -83,6 +83,9 @@ var voice := "voice"
 var _voice: AudioStreamPlayer
 var _speed := CHARS_PER_SEC
 var _last_char := 0
+# Bis zu diesem Zeitpunkt (_t) wird Weiterklicken ignoriert, damit ein doppelt ankommender
+# Tastendruck den gerade aufgedeckten Satz nicht sofort überspringt
+var _input_lock := 0.0
 var _t := 0.0
 var _dive := -1.0
 var _done := false
@@ -418,6 +421,8 @@ func _build_ui() -> void:
 	panel.offset_right = 560
 	panel.offset_top = -230
 	panel.offset_bottom = -40
+	# lange Sätze machen den Kasten nach oben größer statt unten aus dem Bild
+	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	panel.modulate.a = 0.0
 	ui.add_child(panel)
 	var v := VBoxContainer.new()
@@ -487,6 +492,7 @@ func _next_line() -> void:
 	typed = 0.0
 	_last_char = 0
 	hold = 0.0
+	_input_lock = _t + 0.25
 	_speed = CHARS_PER_SEC
 	if panel.modulate.a < 1.0:
 		create_tween().tween_property(panel, "modulate:a", 1.0, 0.5)
@@ -544,13 +550,14 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _advance() -> void:
-	if line < 0 or line >= LINES.size() or _dive >= 0.0:
+	if line < 0 or line >= LINES.size() or _dive >= 0.0 or _t < _input_lock:
 		return
 	var total: int = LINES[line][1].length()
 	if typed < total:
 		# ganzen Satz sofort zeigen
 		typed = total
 		text_label.visible_characters = -1
+		_input_lock = _t + 0.4
 	else:
 		_next_line()
 
