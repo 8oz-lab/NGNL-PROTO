@@ -1,7 +1,7 @@
 # NGNL Proto – Hinweise für Claude
 
-Spiel-Prototyp in **Godot 4.5** (GDScript), inspiriert von *No Game No Life*. Der Nutzer schreibt
-Deutsch, spielt in Godot 4.5 auf Windows und holt Änderungen über GitHub Desktop (Fetch/Pull von
+Spiel-Prototyp in **Godot 4.7** (GDScript), inspiriert von *No Game No Life*. Der Nutzer schreibt
+Deutsch, spielt in Godot 4.7 auf Windows und holt Änderungen über GitHub Desktop (Fetch/Pull von
 `main`). Antworten, Code-Kommentare, Commit-Texte und Spieltexte auf **Deutsch**.
 
 ## Ablauf des Spiels
@@ -21,7 +21,7 @@ Klänge, Schriften, Entwickler-Argumente). Aufbau-Tabelle steht im README.
 
 ## Testen in der Cloud-Session
 
-Der SessionStart-Hook installiert Godot 4.5.1 als `godot` und importiert das Projekt.
+Der SessionStart-Hook installiert Godot 4.7 als `godot` und importiert das Projekt.
 
 - **Skriptfehler prüfen** (kompiliert alles mit Autoloads; `--check-only` taugt nicht, kennt `Flow` nicht):
   `for s in desktop break fall world; do godot --headless --path . --quit-after 120 -- --start=$s 2>&1 | grep "SCRIPT ERROR"; done`
@@ -58,7 +58,7 @@ Der SessionStart-Hook installiert Godot 4.5.1 als `godot` und importiert das Pro
 - Sky-Shader: `TIME` nicht in Hilfsfunktionen verwenden (OpenGL-Fehler), als Parameter übergeben.
 - Kollisionen nie nur unsichtbar machen: Shape deaktivieren oder Knoten entfernen.
 - Nicht mit Größe 0 skalieren und dann `look_at` (det == 0); Modelle erst ausmessen, dann verkleinern.
-- Godot 4.5 schreibt `.uid`-Dateien und neue `.import`-Felder: mitcommitten; bei Konflikten in
+- Godot 4.7 schreibt `.uid`-Dateien und neue `.import`-Felder: mitcommitten; bei Konflikten in
   `.uid` die Version aus `main` (vom Nutzer) behalten.
 - Erfundene Namen für Profis/Promis in Spieltexten, keine echten Personen.
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Richtet Cloud-Sessions ein: Godot 4.5.1 (wie im Editor des Projekts) installieren und das
+# Richtet Cloud-Sessions ein: Godot 4.7 (wie im Editor des Nutzers) installieren und das
 # Projekt einmal importieren, damit Tests und Testaufnahmen sofort laufen.
 set -euo pipefail
 
@@ -7,7 +7,7 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0
 fi
 
-GODOT_VERSION="4.5.1"
+GODOT_VERSION="4.7"
 GODOT_DIR="$HOME/.local/godot-$GODOT_VERSION"
 GODOT_BIN="$GODOT_DIR/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
 
