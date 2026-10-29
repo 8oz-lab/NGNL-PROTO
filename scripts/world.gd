@@ -92,36 +92,14 @@ func _ready() -> void:
 
 func _build_environment() -> void:
 	var env := Environment.new()
-	var sky_mat := ShaderMaterial.new()
-	sky_mat.shader = preload("res://assets/shaders/sky.gdshader")
-	var clouds := NoiseTexture2D.new()
-	clouds.seamless = true
-	clouds.width = 512
-	clouds.height = 512
-	var cn := FastNoiseLite.new()
-	cn.frequency = 0.008
-	cn.fractal_octaves = 5
-	clouds.noise = cn
-	sky_mat.set_shader_parameter("cloud_noise", clouds)
-	var sky := Sky.new()
-	sky.process_mode = Sky.PROCESS_MODE_REALTIME
-	sky.sky_material = sky_mat
-	env.background_mode = Environment.BG_SKY
-	env.sky = sky
-	# Lavendelfarbenes Umgebungslicht: Schatten wirken farbig wie im Anime
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.62, 0.6, 0.85)
-	env.ambient_light_energy = 0.55
+	# derselbe Himmel wie beim Sturz (Farben, Wolken, Dunst in Horizontfarbe)
+	SkyLook.apply(env, 0.0025)
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_white = 2.2
 	env.glow_enabled = true
 	env.glow_intensity = 0.3
 	env.glow_bloom = 0.0
 	env.glow_hdr_threshold = 1.2
-	env.fog_enabled = true
-	env.fog_light_color = Color(0.85, 0.9, 0.97)
-	env.fog_density = 0.004
-	env.fog_sky_affect = 0.0
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
@@ -366,6 +344,40 @@ func _build_neighbourhood() -> void:
 
 # ---------------------------------------------------------------- Burg, Stadtmauer, Horizont
 
+const ISLE_MODEL := "res://assets/models/sky/schwebeinsel.glb"
+const DRAGON_MODEL := "res://assets/models/sky/drache.glb"
+var _sky_floaters: Array = []
+var _dragon: Node3D
+
+
+func _build_sky_figures() -> void:
+	if ResourceLoader.exists(ISLE_MODEL):
+		var spots := [[-60.0, 520.0, 170.0, 120.0], [-15.0, 640.0, 240.0, 170.0], [35.0, 470.0, 120.0, 90.0], [150.0, 600.0, 200.0, 140.0], [230.0, 540.0, 150.0, 110.0], [290.0, 700.0, 260.0, 190.0]]
+		for sp in spots:
+			var ang := deg_to_rad(sp[0])
+			var isle := _prepared(load(ISLE_MODEL), 0.0, sp[3])
+			isle.position = Vector3(sin(ang), 0, -cos(ang)) * sp[1] + Vector3(0, sp[2], 0)
+			isle.rotation.y = ang * 3.0
+			add_child(isle)
+			_sky_floaters.append([isle, isle.position, randf() * TAU])
+	if ResourceLoader.exists(DRAGON_MODEL):
+		_dragon = Node3D.new()
+		var body := _prepared(load(DRAGON_MODEL), 0.0, 40.0)
+		body.rotation.y = PI * 0.5   # Modell schaut in +X, Flugrichtung ist -Z
+		_dragon.add_child(body)
+		add_child(_dragon)
+
+
+func _update_sky_figures() -> void:
+	for f in _sky_floaters:
+		(f[0] as Node3D).position = f[1] + Vector3(0, sin(_time * 0.35 + f[2]) * 4.0, 0)
+	if _dragon:
+		var a := _time * 0.05
+		var pos := Vector3(cos(a) * 420.0, 150.0 + sin(a * 3.0) * 15.0, sin(a) * 420.0 - 60.0)
+		_dragon.position = pos
+		_dragon.look_at(Vector3(cos(a + 0.05) * 420.0, 150.0, sin(a + 0.05) * 420.0 - 60.0), Vector3.UP)
+		_dragon.rotate_object_local(Vector3.FORWARD, -0.3)
+
 ## Burg von Elkia im Norden: Tripo-Modell, sonst die einfache Burg aus Grundformen.
 func _build_castle() -> void:
 	var path := BUILDINGS + "burg.glb"
@@ -533,8 +545,9 @@ func _prepared(scene: PackedScene, height: float, width: float, along_x := false
 	return holder
 
 
-## Riesige Schachfiguren am Horizont, wie überall in Disboard.
+## Riesige Schachfiguren am Horizont, Schwebeinseln und ein Drache, wie beim Sturz.
 func _build_horizon() -> void:
+	_build_sky_figures()
 	var pieces := [QUEEN_SCENE, preload("res://assets/models/props/chess_knight.glb"), preload("res://assets/models/props/chess_bishop.glb")]
 	var spots := [[-30.0, 620.0, 300.0], [25.0, 760.0, 380.0], [70.0, 560.0, 240.0], [140.0, 680.0, 320.0], [200.0, 600.0, 280.0], [255.0, 720.0, 360.0], [310.0, 640.0, 260.0]]
 	for i in spots.size():
@@ -752,6 +765,7 @@ func _process(delta: float) -> void:
 		puff.position = Vector3(1.2 + sin(t * 6.0 + _time) * 0.25, 4.7 + t * 3.0, -6.8 - t * 0.8)
 		puff.scale = Vector3.ONE * (0.6 + t * 1.6)
 		(puff.material_override as StandardMaterial3D).albedo_color.a = 0.65 * (1.0 - t)
+	_update_sky_figures()
 	for flag in _flags:
 		flag.rotation.y = sin(_time * 3.0 + flag.global_position.x) * 0.25
 	if highlight.visible:

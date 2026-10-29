@@ -3,6 +3,7 @@
 #   bauten:  assets/models/buildings/  – Burg, Stadtmauer, Mauerturm, Stadttor
 #   tutorial: assets/models/tutorial/  – Schatztruhe und Wegstein für das Steuerungs-Tutorial
 #   figuren: assets/models/characters/ – Teto (schwebt beim Sturz neben euch)
+#   himmel:  assets/models/sky/        – Schwebeinsel und Drache für den Himmel von Disboard
 #
 # Voraussetzungen: Netzwerkzugriff auf api.tripo3d.ai (und den Download-Host der fertigen Modelle)
 # und der Tripo-Schlüssel: entweder als „Network secret“ der Umgebung (wird automatisch als
@@ -45,11 +46,21 @@ FIGUREN = {
              "loose white and gold tunic with blue accents, short cape, one hand raised waving, the other hand on the hip, "
              "legs slightly bent as if hovering, full body, game character, clean shapes", 20000),
 }
+HIMMEL = {
+    "schwebeinsel": ("floating sky island, a chunk of rock with a lush grassy top and a few round trees, a small waterfall pouring "
+                     "off one edge, roots and blue crystals hanging underneath", 15000),
+    "hauptstadt": ("grand fantasy kingdom capital city seen from above, built on a round coastal hill surrounded by a white stone city wall "
+                   "with towers, a white castle with blue spires on the hilltop, hundreds of small houses with colorful red, blue and "
+                   "orange roofs on terraced streets, a harbor with piers on one side, green fields and trees around the walls", 60000),
+    "drache": ("majestic western dragon in flight with both wings fully spread wide, long elegant tail, white and gold scales, "
+               "gliding pose, full body", 15000),
+}
 SETS = {
     "houses": ("assets/models/houses", {k: (v, 12000) for k, v in HOUSES.items()}),
     "bauten": ("assets/models/buildings", BAUTEN),
     "tutorial": ("assets/models/tutorial", TUTORIAL),
     "figuren": ("assets/models/characters", FIGUREN),
+    "himmel": ("assets/models/sky", HIMMEL),
 }
 
 
