@@ -26,7 +26,7 @@ Auf dem Desktop gibt es außerdem:
 - **Startmenü**, Fenster lassen sich verschieben, an Rand und Ecke in der Größe ziehen und minimieren
 - Symbole verschieben (auch mehrere per Rahmen), Rechtsklick → **Neuer Ordner / Neues Textdokument**, Umbenennen (F2), Löschen (Entf oder auf den Papierkorb ziehen), in Ordner ziehen. Ordner und Texte werden gespeichert (`user://desktop.json`).
 
-**F8** bzw. **Esc** (in den 3D-Szenen) überspringt das Intro. Zum Testen: im Browser `skip:secret` als Adresse eingeben.
+**F8** bzw. **Esc** (in den 3D-Szenen) überspringt das Intro. Zum Testen im Browser als Adresse eingeben: `skip:secret` springt dorthin, wo der Monitor zerbricht und ihr in den PC gezogen werdet (danach Sturz und Landung), `skip:welt` direkt aufs Grundstück.
 
 ## Steuerung
 

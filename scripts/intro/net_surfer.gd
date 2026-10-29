@@ -1,8 +1,10 @@
 class_name NetSurfer
 extends VBoxContainer
-## Browser „NetSurfer 98“ mit dem Forum Threadit. Die Adresse `skip:secret` überspringt das Intro.
+## Browser „NetSurfer 98“ mit dem Forum Threadit.
+## Testcodes: `skip:secret` springt dorthin, wo der Monitor zerbricht und man hineingezogen wird,
+## `skip:welt` direkt aufs Grundstück.
 
-signal secret
+signal secret(target: String)
 signal title_changed(text: String)
 
 const HOST := "http://www.threadit.net"
@@ -89,11 +91,12 @@ func _ready() -> void:
 
 
 func go(url: String) -> void:
-	if url.strip_edges().to_lower() == "skip:secret":
+	var code := url.strip_edges().to_lower()
+	if code == "skip:secret" or code == "skip:welt":
 		addr.text = ""
 		status.text = "Geheimcode akzeptiert …"
 		Flow.play("welcome", -6)
-		secret.emit()
+		secret.emit("break" if code == "skip:secret" else "world")
 		return
 	hist = hist.slice(0, hi + 1)
 	hist.append(url)
